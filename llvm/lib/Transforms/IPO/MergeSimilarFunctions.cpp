@@ -2016,21 +2016,21 @@ void MergeSimilarFunctions::outlineAndMergeFunctions(
   PrintMerges("FNSM", F1, NewF);
 
   errs() << "Merged: " << getVertexName(F1);
-  if (MSFDebug) F1->dump();
+//  if (MSFDebug) F1->dump();
 
   writeThunkWithChoice(NewF, F1, 0);
   for (unsigned FnI = 0, FnE = Fns.size(); FnI != FnE; ++FnI) {
     Function *F2 = Fns[FnI]->getF2();
 
     errs() << ", " << getVertexName(F2);
-    if (MSFDebug) F2->dump();
+//    if (MSFDebug) F2->dump();
 
     PrintMerges("FNSM", F2, NewF);
     writeThunkWithChoice(NewF, F2, FnI + 1);
   }
 
   errs() << " = " << getVertexName(NewF) << "\n";
-  if (MSFDebug) NewF->dump();
+//  if (MSFDebug) NewF->dump();
 
   NumSimilarFunctionsMerged += Fns.size() + 1;
 }

@@ -315,6 +315,7 @@ void initializeMergeFunctionsLegacyPassPass(PassRegistry&);
 void initializeFunctionMergingPass(PassRegistry&);
 void initializeFastFMPass(PassRegistry&);
 void initializeFMSAPass(PassRegistry&);
+void initializeMergeSpecificFunctionsPass(PassRegistry&);
 void initializeMinSizeAttrLegacyPassPass(PassRegistry&);
 void initializeMergeSimilarFunctionsPass(PassRegistry&);
 void initializeMergeICmpsLegacyPassPass(PassRegistry &);

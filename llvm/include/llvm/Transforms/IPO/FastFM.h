@@ -377,5 +377,29 @@ public:
   void getAnalysisUsage(AnalysisUsage &AU) const override;
 };
 
+
+class MergeSpecificFunctions : public ModulePass {
+public:
+  static char ID; // Pass identification, replacement for typeid
+  MergeSpecificFunctions() : ModulePass(ID) {
+     initializeMergeSpecificFunctionsPass(*PassRegistry::getPassRegistry());
+	}
+
+
+  void LoadFile(const char *Filename);
+  void LoadBBNames(const char *Filename);
+  void PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs);
+
+  StringSet<> AlwaysPreserved;
+
+  std::vector<std::pair<std::string, std::string> > listOfFuncNamesToMerge;
+  std::vector<std::pair<std::string, std::string> > alignedBBNames;
+//  FunctionMerging() : ModulePass(ID) {
+//     initializeFunctionMergingPass(*PassRegistry::getPassRegistry());
+//  }
+  bool runOnModule(Module &M) override;
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+};
+
 } // namespace
 #endif

@@ -220,6 +220,7 @@ ModulePass *createMergeFunctionsPass();
 ///
 ModulePass *createFunctionMergingPass();
 ModulePass *createFastFMPass();
+ModulePass *createMergeSpecificFunctionsPass();
 ModulePass *createMinSizeAttrPass();
 
 
