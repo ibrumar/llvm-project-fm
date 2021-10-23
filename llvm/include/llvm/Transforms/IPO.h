@@ -209,6 +209,10 @@ Pass *createReversePostOrderFunctionAttrsPass();
 ///
 ModulePass *createMergeFunctionsPass();
 
+
+ModulePass *createFastFMPass();
+ModulePass *createMergeSpecificFunctionsPass();
+
 //===----------------------------------------------------------------------===//
 /// createHotColdSplittingPass - This pass outlines cold blocks into a separate
 /// function(s).

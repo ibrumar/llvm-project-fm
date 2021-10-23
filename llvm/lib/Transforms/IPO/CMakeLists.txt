@@ -27,6 +27,7 @@ add_llvm_component_library(LLVMipo
   LoopExtractor.cpp
   LowerTypeTests.cpp
   MergeFunctions.cpp
+  FastFM.cpp
   OpenMPOpt.cpp
   PartialInlining.cpp
   PassManagerBuilder.cpp
