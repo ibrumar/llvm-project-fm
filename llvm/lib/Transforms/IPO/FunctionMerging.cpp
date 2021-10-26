@@ -5195,3 +5195,5 @@ bool FunctionMerger::SALSSACodeGen<BlockListType>::generate(
   }
   return MergedFunc != nullptr;
 }
+
+
