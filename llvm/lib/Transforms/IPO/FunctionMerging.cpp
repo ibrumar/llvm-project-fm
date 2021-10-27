@@ -5199,3 +5199,233 @@ bool FunctionMerger::SALSSACodeGen<BlockListType>::generate(
 }
 
 
+class MergeSpecificFunctions : public ModulePass {
+public:
+  static char ID; // Pass identification, replacement for typeid
+  MergeSpecificFunctions() : ModulePass(ID) {
+     initializeMergeSpecificFunctionsLegacyPassPass(*PassRegistry::getPassRegistry());
+	}
+
+
+  void LoadFile(const char *Filename);
+  void LoadBBNames(const char *Filename);
+  void PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs);
+
+  StringSet<> AlwaysPreserved;
+
+  std::vector<std::pair<std::string, std::string> > listOfFuncNamesToMerge;
+  std::vector<std::pair<std::string, std::string> > alignedBBNames;
+//  FunctionMerging() : ModulePass(ID) {
+//     initializeFunctionMergingPass(*PassRegistry::getPassRegistry());
+//  }
+  bool runOnModule(Module &M) override;
+  void getAnalysisUsage(AnalysisUsage &AU) const override;
+};
+
+
+
+
+static cl::opt<std::string>
+FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
+          cl::desc("A file containing the the pairs of functions to be merged per line"),
+          cl::Hidden);
+
+  void MergeSpecificFunctions::LoadFile(const char *Filename) {
+    // Load the BlockFile...
+    std::ifstream In(Filename);
+    if (!In.good()) {
+      errs() << "WARNING: Function merging couldn't load file '" << Filename
+             << "'!\n";
+      exit(-1);
+      return;
+    }
+    while (In) {
+      std::string FunctionToMerge1, FunctionToMerge2;
+      In >> FunctionToMerge1;
+      In >> FunctionToMerge2;
+      if (FunctionToMerge1 != "" and FunctionToMerge2 != "") {
+        FunctionToMerge1 = "@"+FunctionToMerge1;
+        FunctionToMerge2 = "@"+FunctionToMerge2;
+        errs() << "Have to merge " + FunctionToMerge1 + " and " + FunctionToMerge2 << "\n";
+        listOfFuncNamesToMerge.push_back(std::pair<std::string, std::string>(FunctionToMerge1, FunctionToMerge2));
+      }
+        //bbProfiles.push_back(BasicBlockDynProfile(FunctionName, BlockName, numInstructions));
+    }
+  }
+
+
+  void MergeSpecificFunctions::LoadBBNames(const char *Filename) {
+    // Load the BlockFile...
+    std::ifstream In(Filename);
+    alignedBBNames.clear();
+    if (!In.good()) {
+      errs() << "The bb alignment will be computed in this pass as opposed to externally\n";
+      errs() << Filename << "'!\n";
+      return;
+    }
+    while (In) {
+      std::string bbName1, bbName2, bbSimil;
+      In >> bbName1;
+      In >> bbName2;
+      In >> bbSimil;
+      if (bbName1 != "" and bbName2 != "") {
+        errs() << "Have to merge " + bbName1 + " and " + bbName2 << "\n";
+        alignedBBNames.push_back(std::pair<std::string, std::string>(bbName1, bbName2));
+      }
+    }
+  }
+
+
+  //some code you might need but if you don't understand it, delete it.
+  /*for (Function::iterator BB1 = F.begin(), BE = F.end(); BB1 != BE; ++BB1) {
+    Function::iterator BB2 = BB1;
+    BB2++; //+1 can't be used apparently on llvm iterators
+    for (Function::iterator BB2 = F->begin(); BB2 != BE1; ++BB2) {
+      
+    }
+  }*/
+
+
+
+  void MergeSpecificFunctions::PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs) {
+    for (auto it = OrderedBBs.begin(); it != OrderedBBs.end(); ++it) {
+      BasicBlock *bb = *it;
+      int numInstr = 0;
+      for (auto &II : *bb) {
+        numInstr++;
+      }
+      errs() << "BB " << bb->getParent()->getName() << "::" << bb->getName() << " contains " << numInstr << " instructions\n";
+    }
+  }
+
+  //Pass used for merging manually two functions
+  bool MergeSpecificFunctions::runOnModule(Module &M) {
+    LoadFile(FileWithFunctionsToMerge.c_str());
+   
+
+    srand(0);
+
+    FunctionMergingOptions Options = FunctionMergingOptions()
+                                      .maximizeParameterScore(MaxParamScore)
+                                      .matchOnlyIdenticalTypes(IdenticalType)
+                                      .enableUnifiedReturnTypes(EnableUnifiedReturnType);
+    
+    TargetTransformInfo TTI(M.getDataLayout());
+
+    std::vector<Function *> mergingInput1;
+    std::vector<Function *> mergingInput2;
+    int i = 0;
+    for (auto funcNames : listOfFuncNamesToMerge) {
+        std::list<std::pair<Value *, Value *>> AlignedInstsGlobal;
+        double RoughReduction = 0;
+        int numRoughReductions = 0;
+
+        std::string f1_name_noat = funcNames.first.substr(1);
+        std::string f2_name_noat = funcNames.second.substr(1);
+        std::map<std::string, BasicBlock* > bbNameToBB;
+        
+        //if (not FuncConcatMode)
+        //  LoadBBNames(("../matchings/"+f1_name_noat+"_"+f2_name_noat+"_matching.txt").c_str());
+
+        std::set<BasicBlock *> nonalig_bbsf1;
+        std::set<BasicBlock *> nonalig_bbsf2;
+
+        for (Function &F : M) {
+            if (GetValueName(&F) == funcNames.first) {
+
+                //demoteRegToMem(F);
+                mergingInput1.push_back(&F);
+                for (auto &bb1 : F) {
+                  nonalig_bbsf1.insert(&bb1);
+                  errs() << "The nonalig_bbsf1 adds bb " << GetValueName(&F) << "::";
+                  errs() << bb1.getName() << "\n";
+                }
+            }
+            else if (GetValueName(&F) == funcNames.second) {
+                //demoteRegToMem(F);
+                mergingInput2.push_back(&F);
+                for (auto &bb2 : F) {
+                  nonalig_bbsf2.insert(&bb2);
+                  errs() << "The nonalig_bbsf1 adds bb " << GetValueName(&F) << "::";
+                  errs() << bb2.getName() << "\n";
+                }
+            } else
+                continue;
+        }
+        int i = 1; 
+        //This could be failing
+        Function *F1 = mergingInput1[i - 1];
+        Function *F2 = mergingInput2[i - 1];
+
+
+        //FunctionData FD1(F1, new Fingerprint(F1), EstimateFunctionSize(F1, &TTI));
+        //FunctionData FD2(F2, new Fingerprint(F2), EstimateFunctionSize(F2, &TTI));
+        
+        FunctionMerger FM(&M);//,PSI,LookupBFI);
+
+        if ((!FM.validMergeTypes(F1, F2, Options) && !Options.EnableUnifiedReturnType) || !validMergePair(F1, F2))
+          continue;
+
+
+        //Selective function merging
+        std::string Name = "merged_" + listOfFuncNamesToMerge[i-1].first.substr(1) + "_" + listOfFuncNamesToMerge[i-1].second.substr(1);
+        //FunctionMergeResult Result = FM.merge(F1,F2,Name,AlignedBlocks,Options);
+        FunctionMergeResult Result = FM.merge(F1, F2, Name, Options);
+        bool validFunction = true;
+        if (Result.getMergedFunction() != nullptr && verifyFunction(*Result.getMergedFunction())) {
+          if (Debug || Verbose) {
+            errs() << "Invalid Function: " << GetValueName(F1) << ", "
+                   << GetValueName(F2) << "\n";
+           // Result.getMergedFunction()->dump();
+          }
+
+          Result.getMergedFunction()->eraseFromParent();
+          validFunction = false;
+        } else
+          FM.updateCallGraph(Result, AlwaysPreserved, Options);
+
+//end
+
+    }
+    return true; //one possible cause of errors is that sometimes maybe you don't merge anything?
+  } //before returning true check whether there has been any merging
+    
+    
+    //for (auto funcNames : listOfFuncNamesToMerge) {
+    //    Function *F1 = NULL;
+    //    Function *F2 = NULL;
+    //    for (Function &F : M) {
+    //        if (not F.isDeclaration()) {
+    //            if (GetValueName(&F) == funcNames.first)
+    //                F1 = &F;
+    //            else if (GetValueName(&F) == funcNames.second)
+    //                F2 = &F;
+    //        }
+    //        if (F1 != (Function *)NULL and F2 != (Function *)NULL) {
+    //            mergingInput1.push_back(&F);
+    //            mergingInput2.push_back(&F);
+    //        }
+    //    }
+    //}
+
+
+//};
+
+//char MergeSpecificFunctions::ID = 0;
+//static RegisterPass<MergeSpecificFunctions> MLF("merge-list-of-funcs", "Merge only the list of function name pairs present in the file FileWithFunctionsToMerge.");
+
+
+ModulePass *llvm::createMergeSpecificFunctionsPass() {
+  return new MergeSpecificFunctions();
+}
+
+
+void MergeSpecificFunctions::getAnalysisUsage(AnalysisUsage &AU) const {
+  ModulePass::getAnalysisUsage(AU);
+  //AU.addRequired<ProfileSummaryInfoWrapperPass>();
+  //AU.addRequired<BlockFrequencyInfoWrapperPass>();
+}
+
+char MergeSpecificFunctions::ID = 0;
+INITIALIZE_PASS(MergeSpecificFunctions, "merge-list-of-funcs", "Merge only the list of function name pairs present in the file FileWithFunctionsToMerge.", false, false)
+

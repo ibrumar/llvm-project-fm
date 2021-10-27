@@ -213,6 +213,7 @@ ModulePass *createMergeFunctionsPass();
 /// code size.
 ///
 ModulePass *createFunctionMergingPass();
+ModulePass *createMergeSpecificFunctionsPass();
 
 //===----------------------------------------------------------------------===//
 /// createHotColdSplittingPass - This pass outlines cold blocks into a separate
