@@ -5199,10 +5199,10 @@ bool FunctionMerger::SALSSACodeGen<BlockListType>::generate(
 }
 
 
-class MergeSpecificFunctions : public ModulePass {
+class MergeSpecificFunctionsLegacyPass : public ModulePass {
 public:
   static char ID; // Pass identification, replacement for typeid
-  MergeSpecificFunctions() : ModulePass(ID) {
+  MergeSpecificFunctionsLegacyPass() : ModulePass(ID) {
      initializeMergeSpecificFunctionsLegacyPassPass(*PassRegistry::getPassRegistry());
 	}
 
@@ -5230,7 +5230,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
           cl::desc("A file containing the the pairs of functions to be merged per line"),
           cl::Hidden);
 
-  void MergeSpecificFunctions::LoadFile(const char *Filename) {
+  void MergeSpecificFunctionsLegacyPass::LoadFile(const char *Filename) {
     // Load the BlockFile...
     std::ifstream In(Filename);
     if (!In.good()) {
@@ -5254,7 +5254,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
   }
 
 
-  void MergeSpecificFunctions::LoadBBNames(const char *Filename) {
+  void MergeSpecificFunctionsLegacyPass::LoadBBNames(const char *Filename) {
     // Load the BlockFile...
     std::ifstream In(Filename);
     alignedBBNames.clear();
@@ -5287,7 +5287,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
 
 
 
-  void MergeSpecificFunctions::PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs) {
+  void MergeSpecificFunctionsLegacyPass::PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs) {
     for (auto it = OrderedBBs.begin(); it != OrderedBBs.end(); ++it) {
       BasicBlock *bb = *it;
       int numInstr = 0;
@@ -5299,7 +5299,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
   }
 
   //Pass used for merging manually two functions
-  bool MergeSpecificFunctions::runOnModule(Module &M) {
+  bool MergeSpecificFunctionsLegacyPass::runOnModule(Module &M) {
     LoadFile(FileWithFunctionsToMerge.c_str());
    
 
@@ -5416,16 +5416,16 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
 
 
 ModulePass *llvm::createMergeSpecificFunctionsPass() {
-  return new MergeSpecificFunctions();
+  return new MergeSpecificFunctionsLegacyPass();
 }
 
 
-void MergeSpecificFunctions::getAnalysisUsage(AnalysisUsage &AU) const {
+void MergeSpecificFunctionsLegacyPass::getAnalysisUsage(AnalysisUsage &AU) const {
   ModulePass::getAnalysisUsage(AU);
   //AU.addRequired<ProfileSummaryInfoWrapperPass>();
   //AU.addRequired<BlockFrequencyInfoWrapperPass>();
 }
 
-char MergeSpecificFunctions::ID = 0;
-INITIALIZE_PASS(MergeSpecificFunctions, "merge-list-of-funcs", "Merge only the list of function name pairs present in the file FileWithFunctionsToMerge.", false, false)
+char MergeSpecificFunctionsLegacyPass::ID = 0;
+INITIALIZE_PASS(MergeSpecificFunctionsLegacyPass, "merge-list-of-funcs", "Merge only the list of function name pairs present in the file FileWithFunctionsToMerge.", false, false)
 
