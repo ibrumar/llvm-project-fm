@@ -2947,6 +2947,9 @@ void FunctionMerger::replaceByCall(Function *F, FunctionMergeResult &MFR,
   Value *FuncId = MFR.getFunctionIdValue(F);
   Function *MergedF = MFR.getMergedFunction();
 
+  // Make sure we preserve its linkage
+  auto Linkage = F->getLinkage();
+
   F->deleteBody();
   BasicBlock *NewBB = BasicBlock::Create(Context, "", F);
   IRBuilder<> Builder(NewBB);
@@ -2974,6 +2977,8 @@ void FunctionMerger::replaceByCall(Function *F, FunctionMergeResult &MFR,
       args[i] = UndefValue::get(MergedF->getFunctionType()->getParamType(i));
     }
   }
+
+  F->setLinkage(Linkage);
 
   CallInst *CI =
       (CallInst *)Builder.CreateCall(MergedF, ArrayRef<Value *>(args));
