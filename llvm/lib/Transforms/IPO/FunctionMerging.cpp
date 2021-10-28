@@ -5306,7 +5306,8 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
   //Pass used for merging manually two functions
   bool MergeSpecificFunctionsLegacyPass::runOnModule(Module &M) {
     LoadFile(FileWithFunctionsToMerge.c_str());
-   
+
+    unsigned NumMerges = 0;   
 
     srand(0);
 
@@ -5386,13 +5387,15 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
 
           Result.getMergedFunction()->eraseFromParent();
           validFunction = false;
-        } else
+        } else if(Result.getMergedFunction()) {
           FM.updateCallGraph(Result, AlwaysPreserved, Options);
+	  NumMerges++;
+	}
 
 //end
 
     }
-    return true; //one possible cause of errors is that sometimes maybe you don't merge anything?
+    return (NumMerges>0); //one possible cause of errors is that sometimes maybe you don't merge anything?
   } //before returning true check whether there has been any merging
     
     
