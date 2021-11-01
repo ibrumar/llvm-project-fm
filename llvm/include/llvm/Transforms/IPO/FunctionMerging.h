@@ -191,6 +191,8 @@ private:
   const DataLayout *DL;
   LLVMContext *ContextPtr;
 
+  std::map<unsigned, int> OpcodeWeights;
+
   // cache of linear functions
   // KeyValueCache<Function *, SmallVector<Value *, 8>> LFCache;
 
@@ -201,6 +203,8 @@ private:
   // int CountBinOps = 0;
 
   enum LinearizationKind { LK_Random, LK_Canonical };
+
+
 
   void linearize(Function *F, SmallVectorImpl<Value *> &FVec,
                  LinearizationKind LK = LinearizationKind::LK_Canonical);
@@ -236,11 +240,11 @@ public:
   static bool areTypesEquivalent(Type *Ty1, Type *Ty2, const DataLayout *DL,
                                  const FunctionMergingOptions &Options = {});
 
-  static bool isSAProfitable(AlignedSequence<Value *> &AlignedBlocks);
-  static bool isPAProfitable(BasicBlock *BB1, BasicBlock *BB2);
+  bool isSAProfitable(AlignedSequence<Value *> &AlignedBlocks);
+  bool isPAProfitable(BasicBlock *BB1, BasicBlock *BB2);
 
-  static void extendAlignedSeq(AlignedSequence<Value *> &AlignedSeq, AlignedSequence<Value *> &AlignedSubSeq, AlignmentStats &stats);
-  static void extendAlignedSeq(AlignedSequence<Value *> &AlignedSeq, BasicBlock *BB1, BasicBlock *BB2, AlignmentStats &stats);
+  void extendAlignedSeq(AlignedSequence<Value *> &AlignedSeq, AlignedSequence<Value *> &AlignedSubSeq, AlignmentStats &stats);
+  void extendAlignedSeq(AlignedSequence<Value *> &AlignedSeq, BasicBlock *BB1, BasicBlock *BB2, AlignmentStats &stats);
 
   static bool match(Value *V1, Value *V2);
 
@@ -250,6 +254,9 @@ public:
 
   FunctionMergeResult merge(Function *F1, Function *F2, std::string Name = "",
                             const FunctionMergingOptions &Options = {});
+
+  void initOpcodeWeightsByName(std::map<std::string, int> &strOpcodeWeights);
+  int getOpcodeWeight(unsigned opcode);
 
   template <typename BlockListType> class CodeGenerator {
   private:

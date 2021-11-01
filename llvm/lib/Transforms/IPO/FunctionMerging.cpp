@@ -2367,19 +2367,19 @@ bool FunctionMerger::isPAProfitable(BasicBlock *BB1, BasicBlock *BB2){
     Instruction *I1 = &*It1;
     Instruction *I2 = &*It2;
 
-    OriginalCost += 2;
+    OriginalCost += getOpcodeWeight(I1->getOpcode())+getOpcodeWeight(I2->getOpcode());
     if (matchInstructions(I1, I2)) {
-      MergedCost += 1; // reduces 1 inst by merging two insts into one
+      MergedCost += getOpcodeWeight(I1->getOpcode()); // reduces 1 inst by merging two insts into one
       if (InsideSplit) {
         InsideSplit = false;
-        MergedCost += 2; // two branches to converge
+        MergedCost += 2*getOpcodeWeight(Instruction::Br); // two branches to converge
       }
     } else {
       if (!InsideSplit) {
         InsideSplit = true;
-        MergedCost += 1; // one branch to split
+        MergedCost += getOpcodeWeight(Instruction::Br); // one branch to split
       }
-      MergedCost += 2; // two instructions
+      MergedCost += getOpcodeWeight(I1->getOpcode())+getOpcodeWeight(I2->getOpcode()); // two instructions
     }
     It1++;
     It2++;
@@ -2503,6 +2503,11 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     for (BasicBlock &BB1 : *F1) {
       BlockFingerprint BD1(&BB1);
       MemSize += BD1.footprint();
+
+      for (unsigned opcode = 0; opcode<BD1.MaxOpcode; opcode++) {
+        BD1.OpcodeFreq[opcode] *= getOpcodeWeight(opcode);
+      }
+
       NumBB1++;
       Blocks.push_back(std::move(BD1));
     }
@@ -2517,6 +2522,10 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
       NumBB2++;
       BasicBlock *BB2 = &BIt;
       BlockFingerprint BD2(BB2);
+
+      for (unsigned opcode = 0; opcode<BD2.MaxOpcode; opcode++) {
+        BD2.OpcodeFreq[opcode] *= getOpcodeWeight(opcode);
+      }
 
       auto BestIt = Blocks.end();
       float BestDist = std::numeric_limits<float>::max();
@@ -2598,6 +2607,10 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
       BlockFingerprint BD1(&BB1);
       NumBB1++;
       MemSize += BD1.footprint();
+      for (unsigned opcode = 0; opcode<BD1.MaxOpcode; opcode++) {
+        BD1.OpcodeFreq[opcode] *= getOpcodeWeight(opcode);
+      }
+
       BlocksF1[BD1.Size].push_back(std::move(BD1));
     }
 #ifdef TIME_STEPS_DEBUG
@@ -2611,6 +2624,10 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
       NumBB2++;
       BasicBlock *BB2 = &BIt;
       BlockFingerprint BD2(BB2);
+
+      for (unsigned opcode = 0; opcode<BD2.MaxOpcode; opcode++) {
+        BD2.OpcodeFreq[opcode] *= getOpcodeWeight(opcode);
+      }
 
       auto &SetRef = BlocksF1[BD2.Size];
 
@@ -3162,6 +3179,20 @@ void FunctionMerger::updateCallGraph(FunctionMergeResult &MFR,
   Function *F2 = FPair.second;
   updateCallGraph(F1, MFR, AlwaysPreserved, Options);
   updateCallGraph(F2, MFR, AlwaysPreserved, Options);
+}
+
+void FunctionMerger::initOpcodeWeightsByName(std::map<std::string, int> &strOpcodeWeights) {
+  for(unsigned opcode = 0; opcode<BlockFingerprint::MaxOpcode; opcode++) {
+    std::string opcodeName = Instruction::getOpcodeName(opcode);
+    if (strOpcodeWeights.find(opcodeName)!=strOpcodeWeights.end()) {
+      OpcodeWeights[opcode] = strOpcodeWeights[opcodeName];
+    }
+  }
+}
+
+int FunctionMerger::getOpcodeWeight(unsigned opcode) {
+  if (OpcodeWeights.find(opcode)!=OpcodeWeights.end()) return OpcodeWeights[opcode];
+  else return 1;
 }
 
 static int EstimateThunkOverhead(FunctionMergeResult &MFR,
@@ -5214,12 +5245,17 @@ public:
 
   void LoadFile(const char *Filename);
   void LoadBBNames(const char *Filename);
+  void LoadOpcodeWeights(const char *Filename);
+
   void PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs);
 
   StringSet<> AlwaysPreserved;
 
   std::vector<std::pair<std::string, std::string> > listOfFuncNamesToMerge;
   std::vector<std::pair<std::string, std::string> > alignedBBNames;
+
+  std::map<std::string, int> opcodeWeights;
+
 //  FunctionMerging() : ModulePass(ID) {
 //     initializeFunctionMergingPass(*PassRegistry::getPassRegistry());
 //  }
@@ -5232,7 +5268,12 @@ public:
 
 static cl::opt<std::string>
 FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
-          cl::desc("A file containing the the pairs of functions to be merged per line"),
+          cl::desc("A file containing the pairs of functions to be merged per line"),
+          cl::Hidden);
+
+static cl::opt<std::string>
+FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
+          cl::desc("A file containing the opcode weights for the merging"),
           cl::Hidden);
 
   void MergeSpecificFunctionsLegacyPass::LoadFile(const char *Filename) {
@@ -5290,7 +5331,20 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
     }
   }*/
 
-
+  void MergeSpecificFunctionsLegacyPass::LoadOpcodeWeights(const char *Filename) {
+    std::ifstream In(Filename);
+    if (!In.good()) {
+      errs() << "The opcode weights will be the default.\n";
+      errs() << Filename << " not found'!\n";
+      return;
+    }
+    while (In) {
+      std::string opcode, weight;
+      In >> opcode;
+      In >> weight;
+      opcodeWeights[opcode] = std::stoi(weight);
+    }
+  }
 
   void MergeSpecificFunctionsLegacyPass::PrintInstrsInOrdBBs(std::list<BasicBlock *> &OrderedBBs) {
     for (auto it = OrderedBBs.begin(); it != OrderedBBs.end(); ++it) {
@@ -5306,6 +5360,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
   //Pass used for merging manually two functions
   bool MergeSpecificFunctionsLegacyPass::runOnModule(Module &M) {
     LoadFile(FileWithFunctionsToMerge.c_str());
+    LoadOpcodeWeights(FileOpcodeWeights.c_str());
 
     unsigned NumMerges = 0;   
 
@@ -5368,6 +5423,7 @@ FileWithFunctionsToMerge("func-to-merge-file", cl::value_desc("funcname"),
         //FunctionData FD2(F2, new Fingerprint(F2), EstimateFunctionSize(F2, &TTI));
         
         FunctionMerger FM(&M);//,PSI,LookupBFI);
+        FM.initOpcodeWeightsByName(opcodeWeights);
 
         if ((!FM.validMergeTypes(F1, F2, Options) && !Options.EnableUnifiedReturnType) || !validMergePair(F1, F2))
           continue;
