@@ -23,7 +23,7 @@
 #include <functional>
 #include <limits.h> // INT_MIN
 
-#define ScoreSystemType  int
+#define ScoreSystemType  float
 
 // Store alignment result here
 template<typename Ty, Ty Blank=Ty(0)>
@@ -92,59 +92,66 @@ public:
 
 };
 
+template<class ValueT, class MapFn>
 class ScoringSystem {
   ScoreSystemType Gap;
   ScoreSystemType Match;
   ScoreSystemType Mismatch;
   bool AllowMismatch;
+  MapFn WeightFn;
+
 public:
-  ScoringSystem(ScoreSystemType Gap, ScoreSystemType Match) {
+  ScoringSystem(ScoreSystemType Gap, ScoreSystemType Match, MapFn WeightFn) : WeightFn(WeightFn) {
     this->Gap = Gap;
     this->Match = Match;
     this->Mismatch = std::numeric_limits<ScoreSystemType>::min();
     this->AllowMismatch = false;
   }
 
-  ScoringSystem(ScoreSystemType Gap, ScoreSystemType Match, ScoreSystemType Mismatch, bool AllowMismatch = true) {
+  ScoringSystem(ScoreSystemType Gap, ScoreSystemType Match, ScoreSystemType Mismatch, MapFn WeightFn) : WeightFn(WeightFn) {
     this->Gap = Gap;
     this->Match = Match;
     this->Mismatch = Mismatch;
-    this->AllowMismatch = AllowMismatch;
+    this->AllowMismatch = true;
   }
 
   bool getAllowMismatch() {
     return AllowMismatch;
   }
 
-  ScoreSystemType getMismatchPenalty() {
-    return Mismatch;
+  ScoreSystemType getMismatchPenalty(ValueT V1, ValueT V2) {
+    return Mismatch*WeightFn(V1,V2);
   }
 
   ScoreSystemType getGapPenalty() {
     return Gap;
   }
 
-  ScoreSystemType getMatchProfit() {
-    return Match;
+  ScoreSystemType getGapPenalty(ValueT V) {
+    return Gap*WeightFn(V);
+  }
+
+  ScoreSystemType getMatchProfit(ValueT V1, ValueT V2) {
+    return Match*WeightFn(V1,V2);
   }
 };
 
-template<typename ContainerType, typename Ty=typename ContainerType::value_type, Ty Blank=Ty(0), typename MatchFnTy=std::function<bool(Ty,Ty)>>
+template<typename ScoreT, typename ContainerType, typename Ty=typename ContainerType::value_type, Ty Blank=Ty(0), typename MatchFnTy=std::function<bool(Ty,Ty)>>
 class SequenceAligner {
 private:
-  ScoringSystem Scoring;
+  ScoreT Scoring;
   MatchFnTy Match;
 
 public:
 
   using EntryType = typename AlignedSequence<Ty,Blank>::Entry;
 
-  SequenceAligner(ScoringSystem Scoring, MatchFnTy Match = nullptr)
+  SequenceAligner(ScoreT Scoring, MatchFnTy Match = nullptr)
     : Scoring(Scoring), Match(Match) {}  
 
   virtual ~SequenceAligner() = default;
 
-  ScoringSystem &getScoring() { return Scoring; }
+  ScoreT &getScoring() { return Scoring; }
 
   bool match(Ty Val1, Ty Val2) {
     return Match(Val1,Val2);
@@ -159,7 +166,5 @@ public:
 };
 
 #include "llvm/ADT/SANeedlemanWunsch.h"
-#include "llvm/ADT/SAHirschberg.h"
-#include "llvm/ADT/SADiagonalWindows.h"
 
 #endif

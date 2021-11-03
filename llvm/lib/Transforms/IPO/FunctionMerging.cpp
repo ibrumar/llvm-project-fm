@@ -901,9 +901,11 @@ static bool matchCallInsts(const CallBase *CI1, const CallBase *CI2) {
     }
   }
 
-  return CI1->getNumArgOperands() == CI2->getNumArgOperands() &&
+  bool Result = 
+         CI1->getNumArgOperands() == CI2->getNumArgOperands() &&
          CI1->getCallingConv() == CI2->getCallingConv() &&
          CI1->getAttributes() == CI2->getAttributes();
+  return Result;
 }
 
 static bool matchInvokeInsts(const InvokeInst *II1, const InvokeInst *II2) {
@@ -1623,7 +1625,7 @@ private:
   const uint32_t _footprint;
 
 public:
-  uint64_t magnitude{0};
+  float magnitude{0};
   std::vector<uint32_t> hash;
   std::vector<uint32_t> bandHash;
 
@@ -1632,7 +1634,7 @@ public:
 
   FingerprintMH(T owner, SearchStrategy &searchStrategy) : _footprint(searchStrategy.item_footprint()) {
     std::vector<uint32_t> integers;
-    std::array<uint32_t, MaxOpcode> OpcodeFreq;
+    std::array<float, MaxOpcode> OpcodeFreq;
 
     for (size_t i = 0; i < MaxOpcode; i++)
       OpcodeFreq[i] = 0;
@@ -1641,7 +1643,7 @@ public:
     {
       for (Instruction &I : getInstructions(owner)) {
         integers.push_back(instToInt(&I));
-        OpcodeFreq[I.getOpcode()]++;
+        OpcodeFreq[I.getOpcode()] += 1;
         if (I.isTerminator())
             OpcodeFreq[0] += I.getNumSuccessors();
       }
@@ -1655,7 +1657,7 @@ public:
         for (Instruction &I : BB)
         {
           integers.push_back(instToInt(&I));
-          OpcodeFreq[I.getOpcode()]++;
+          OpcodeFreq[I.getOpcode()] += 1;
           if(I.isTerminator())
             OpcodeFreq[0] += I.getNumSuccessors();
         }
@@ -1671,7 +1673,7 @@ public:
     }
 
     for (size_t i = 0; i < MaxOpcode; ++i) {
-      uint64_t val = OpcodeFreq[i];
+      float val = OpcodeFreq[i];
       magnitude += val * val;
     }
 
@@ -1735,9 +1737,9 @@ public:
 
 template <class T> class Fingerprint {
 public:
-  uint64_t magnitude{0};
+  float magnitude{0};
   static const size_t MaxOpcode = 68;
-  std::array<uint32_t, MaxOpcode> OpcodeFreq;
+  std::array<float, MaxOpcode> OpcodeFreq;
 
   Fingerprint() = default;
 
@@ -1747,12 +1749,12 @@ public:
       OpcodeFreq[i] = 0;
 
     for (Instruction &I : getInstructions(owner)) {
-      OpcodeFreq[I.getOpcode()]++;
+      OpcodeFreq[I.getOpcode()] += 1;
       if (I.isTerminator())
         OpcodeFreq[0] += I.getNumSuccessors();
     }
     for (size_t i = 0; i < MaxOpcode; i++) {
-      uint64_t val = OpcodeFreq[i];
+      float val = OpcodeFreq[i];
       magnitude += val * val;
     }
   }
@@ -1760,10 +1762,10 @@ public:
   uint32_t footprint() const { return sizeof(int) * MaxOpcode; }
 
   float distance(const Fingerprint &FP2) const {
-    int Distance = 0;
+    float Distance = 0;
     for (size_t i = 0; i < MaxOpcode; i++) {
-      int Freq1 = OpcodeFreq[i];
-      int Freq2 = FP2.OpcodeFreq[i];
+      float Freq1 = OpcodeFreq[i];
+      float Freq2 = FP2.OpcodeFreq[i];
       Distance += std::abs(Freq1 - Freq2);
     }
     return static_cast<float>(Distance);
@@ -2276,7 +2278,7 @@ public:
     char distance_mh_str[20];
 
     for (auto &entry: candidates) {
-      uint64_t val = 0;
+      float val = 0;
       for (auto &num: entry.FPF.OpcodeFreq)
         val += num;
       errs() << "Function Name: " << GetValueName(entry.candidate)
@@ -2348,8 +2350,8 @@ bool FunctionMerger::isSAProfitable(AlignedSequence<Value *> &AlignedBlocks) {
 }
 
 bool FunctionMerger::isPAProfitable(BasicBlock *BB1, BasicBlock *BB2){
-  int OriginalCost = 0;
-  int MergedCost = 0;
+  float OriginalCost = 0;
+  float MergedCost = 0;
 
   bool InsideSplit = !FunctionMerger::match(BB1, BB2);
   if(InsideSplit)
@@ -2470,6 +2472,27 @@ void FunctionMerger::extendAlignedSeq(AlignedSequence<Value *> &AlignedSeq, Alig
 
 bool AcrossBlocks;
 
+class WeightFunction {
+  std::map<unsigned, float> OpcodeWeights;
+  float getOpcodeWeight(unsigned opcode) {
+    if (OpcodeWeights.find(opcode)!=OpcodeWeights.end()) return OpcodeWeights[opcode];
+    else return 1;
+  }
+
+  float getValueWeight(Value *V) {
+    if (Instruction *I = dyn_cast<Instruction>(V)) {
+      return getOpcodeWeight(I->getOpcode());
+    } else return 1;
+  }
+
+public:
+
+  WeightFunction(std::map<unsigned, float> OpcodeWeights) : OpcodeWeights(OpcodeWeights) {}
+
+  float operator()(Value *V) { return getValueWeight(V); }
+  float operator()(Value *V1, Value *V2) { return getValueWeight(V1)+getValueWeight(V2); }
+};
+
 FunctionMergeResult
 FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const FunctionMergingOptions &Options) {
   bool ProfitableFn = true;
@@ -2558,7 +2581,9 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
           if (!isa<PHINode>(&I) && !isa<LandingPadInst>(&I))
             BB2Vec.push_back(&I);
 
-        NeedlemanWunschSA<SmallVectorImpl<Value *>> SA(ScoringSystem(-1, 2), FunctionMerger::match);
+        WeightFunction WeightFn(OpcodeWeights);
+	ScoringSystem<Value*,WeightFunction> Scoring(-1, 1, WeightFn);
+	NeedlemanWunschSA<ScoringSystem<Value*,WeightFunction>,SmallVectorImpl<Value *>> SA(Scoring, FunctionMerger::match);
 
         auto MemReq = SA.getMemoryRequirement(BB1Vec, BB2Vec);
         if (Verbose)
@@ -2681,7 +2706,10 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     TimeLin.stopTimer();
 #endif
 
-    NeedlemanWunschSA<SmallVectorImpl<Value *>> SA(ScoringSystem(-1, 2), FunctionMerger::match);
+        WeightFunction WeightFn(OpcodeWeights);
+	ScoringSystem<Value*,WeightFunction> Scoring(-1, 1, WeightFn);
+	NeedlemanWunschSA<ScoringSystem<Value*,WeightFunction>,SmallVectorImpl<Value *>> SA(Scoring, FunctionMerger::match);
+    //NeedlemanWunschSA<SmallVectorImpl<Value *>> SA(ScoringSystem(-1, 2), FunctionMerger::match);
 
     auto MemReq = SA.getMemoryRequirement(F1Vec, F2Vec);
     auto MemAvailable = getTotalSystemMemory();
@@ -2756,7 +2784,7 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     return ErrorResponse;
 
   // errs() << "Code Gen\n";
-#ifdef ENABLE_DEBUG_CODE
+//#ifdef ENABLE_DEBUG_CODE
   if (Verbose) {
     for (auto &Entry : AlignedSeq) {
       if (Entry.match()) {
@@ -2791,7 +2819,7 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
       }
     }
   }
-#endif
+//#endif
 
 #ifdef TIME_STEPS_DEBUG
   TimeParam.startTimer();
@@ -3181,7 +3209,7 @@ void FunctionMerger::updateCallGraph(FunctionMergeResult &MFR,
   updateCallGraph(F2, MFR, AlwaysPreserved, Options);
 }
 
-void FunctionMerger::initOpcodeWeightsByName(std::map<std::string, int> &strOpcodeWeights) {
+void FunctionMerger::initOpcodeWeightsByName(std::map<std::string, float> &strOpcodeWeights) {
   for(unsigned opcode = 0; opcode<BlockFingerprint::MaxOpcode; opcode++) {
     std::string opcodeName = Instruction::getOpcodeName(opcode);
     if (strOpcodeWeights.find(opcodeName)!=strOpcodeWeights.end()) {
@@ -3190,7 +3218,7 @@ void FunctionMerger::initOpcodeWeightsByName(std::map<std::string, int> &strOpco
   }
 }
 
-int FunctionMerger::getOpcodeWeight(unsigned opcode) {
+float FunctionMerger::getOpcodeWeight(unsigned opcode) {
   if (OpcodeWeights.find(opcode)!=OpcodeWeights.end()) return OpcodeWeights[opcode];
   else return 1;
 }
@@ -5254,7 +5282,7 @@ public:
   std::vector<std::pair<std::string, std::string> > listOfFuncNamesToMerge;
   std::vector<std::pair<std::string, std::string> > alignedBBNames;
 
-  std::map<std::string, int> opcodeWeights;
+  std::map<std::string, float> opcodeWeights;
 
 //  FunctionMerging() : ModulePass(ID) {
 //     initializeFunctionMergingPass(*PassRegistry::getPassRegistry());
@@ -5342,7 +5370,10 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
       std::string opcode, weight;
       In >> opcode;
       In >> weight;
-      opcodeWeights[opcode] = std::stoi(weight);
+      if (opcode != "" and weight != "") {
+        errs() << opcode << " = " << weight  << "\n";
+        opcodeWeights[opcode] = std::stof(weight);
+      }
     }
   }
 
@@ -5407,7 +5438,7 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
                 mergingInput2.push_back(&F);
                 for (auto &bb2 : F) {
                   nonalig_bbsf2.insert(&bb2);
-                  errs() << "The nonalig_bbsf1 adds bb " << GetValueName(&F) << "::";
+                  errs() << "The nonalig_bbsf2 adds bb " << GetValueName(&F) << "::";
                   errs() << bb2.getName() << "\n";
                 }
             } else
@@ -5418,16 +5449,14 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
         Function *F1 = mergingInput1[i - 1];
         Function *F2 = mergingInput2[i - 1];
 
-
-        //FunctionData FD1(F1, new Fingerprint(F1), EstimateFunctionSize(F1, &TTI));
-        //FunctionData FD2(F2, new Fingerprint(F2), EstimateFunctionSize(F2, &TTI));
+	if (Debug)
+          errs() << "Attempting: " << F1->getName() << ", " << F2->getName() << "\n";
         
         FunctionMerger FM(&M);//,PSI,LookupBFI);
         FM.initOpcodeWeightsByName(opcodeWeights);
 
         if ((!FM.validMergeTypes(F1, F2, Options) && !Options.EnableUnifiedReturnType) || !validMergePair(F1, F2))
           continue;
-
 
         //Selective function merging
         std::string Name = "merged_" + listOfFuncNamesToMerge[i-1].first.substr(1) + "_" + listOfFuncNamesToMerge[i-1].second.substr(1);
@@ -5447,7 +5476,6 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
           FM.updateCallGraph(Result, AlwaysPreserved, Options);
 	  NumMerges++;
 	}
-
 //end
 
     }

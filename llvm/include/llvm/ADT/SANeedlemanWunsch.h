@@ -1,8 +1,10 @@
-template <typename ContainerType,
+#include <llvm/Support/raw_ostream.h>
+
+template <typename ScoreT, typename ContainerType,
           typename Ty = typename ContainerType::value_type, Ty Blank = Ty(0),
           typename MatchFnTy = std::function<bool(Ty, Ty)>>
 class NeedlemanWunschSA
-    : public SequenceAligner<ContainerType, Ty, Blank, MatchFnTy> {
+    : public SequenceAligner<ScoreT, ContainerType, Ty, Blank, MatchFnTy> {
 private:
   ScoreSystemType *Matrix;
   size_t MatrixRows;
@@ -19,7 +21,7 @@ private:
   size_t MaxRow;
   size_t MaxCol;
 
-  using BaseType = SequenceAligner<ContainerType, Ty, Blank, MatchFnTy>;
+  using BaseType = SequenceAligner<ScoreT, ContainerType, Ty, Blank, MatchFnTy>;
 
   void cacheAllMatches(ContainerType &Seq1, ContainerType &Seq2) {
     if (BaseType::getMatchOperation() == nullptr) {
@@ -47,13 +49,13 @@ private:
     MatrixRows = NumRows;
     MatrixCols = NumCols;
 
-    ScoringSystem &Scoring = BaseType::getScoring();
+    auto &Scoring = BaseType::getScoring();
     const ScoreSystemType Gap = Scoring.getGapPenalty();
-    const ScoreSystemType Match = Scoring.getMatchProfit();
+    //const ScoreSystemType Match = Scoring.getMatchProfit();
     const bool AllowMismatch = Scoring.getAllowMismatch();
-    const ScoreSystemType Mismatch =
-        AllowMismatch ? Scoring.getMismatchPenalty()
-                      : std::numeric_limits<ScoreSystemType>::min();
+    //const ScoreSystemType Mismatch =
+    //    AllowMismatch ? Scoring.getMismatchPenalty()
+    //                  : std::numeric_limits<ScoreSystemType>::min();
 
     for (unsigned i = 0; i < NumRows; i++)
       Matrix[i * NumCols + 0] = i * Gap;
@@ -61,10 +63,18 @@ private:
       Matrix[0 * NumCols + j] = j * Gap;
 
     ScoreSystemType MaxScore = std::numeric_limits<ScoreSystemType>::min();
+
     if (Matches) {
       if (AllowMismatch) {
         for (unsigned i = 1; i < NumRows; i++) {
           for (unsigned j = 1; j < NumCols; j++) {
+            const ScoreSystemType Match = Scoring.getMatchProfit(Seq1[i-1],Seq2[j-1]);
+            const ScoreSystemType Mismatch =
+                AllowMismatch ? Scoring.getMismatchPenalty(Seq1[i-1],Seq2[j-1])
+                              : std::numeric_limits<ScoreSystemType>::min();
+            //const ScoreSystemType Gap1 = Scoring.getGapPenalty(Seq1[i-1]);
+            //const ScoreSystemType Gap2 = Scoring.getGapPenalty(Seq2[j-1]);
+
             ScoreSystemType Similarity =
                 Matches[(i - 1) * MatchesCols + j - 1] ? Match : Mismatch;
             ScoreSystemType Diagonal =
@@ -83,6 +93,13 @@ private:
       } else {
         for (unsigned i = 1; i < NumRows; i++) {
           for (unsigned j = 1; j < NumCols; j++) {
+            const ScoreSystemType Match = Scoring.getMatchProfit(Seq1[i-1],Seq2[j-1]);
+            const ScoreSystemType Mismatch =
+                AllowMismatch ? Scoring.getMismatchPenalty(Seq1[i-1],Seq2[j-1])
+                              : std::numeric_limits<ScoreSystemType>::min();
+            //const ScoreSystemType Gap1 = Scoring.getGapPenalty(Seq1[i-1]);
+            //const ScoreSystemType Gap2 = Scoring.getGapPenalty(Seq2[j-1]);
+
             ScoreSystemType Diagonal =
             	    Matches[(i - 1) * MatchesCols + j - 1]
                     ? (Matrix[(i - 1) * NumCols + j - 1] + Match)
@@ -103,6 +120,13 @@ private:
       if (AllowMismatch) {
         for (unsigned i = 1; i < NumRows; i++) {
           for (unsigned j = 1; j < NumCols; j++) {
+            const ScoreSystemType Match = Scoring.getMatchProfit(Seq1[i-1],Seq2[j-1]);
+            const ScoreSystemType Mismatch =
+                AllowMismatch ? Scoring.getMismatchPenalty(Seq1[i-1],Seq2[j-1])
+                              : std::numeric_limits<ScoreSystemType>::min();
+            //const ScoreSystemType Gap1 = Scoring.getGapPenalty(Seq1[i-1]);
+            //const ScoreSystemType Gap2 = Scoring.getGapPenalty(Seq2[j-1]);
+
             ScoreSystemType Similarity =
                 (Seq1[i - 1] == Seq2[j - 1]) ? Match : Mismatch;
             ScoreSystemType Diagonal =
@@ -121,6 +145,13 @@ private:
       } else {
         for (unsigned i = 1; i < NumRows; i++) {
           for (unsigned j = 1; j < NumCols; j++) {
+            const ScoreSystemType Match = Scoring.getMatchProfit(Seq1[i-1],Seq2[j-1]);
+            const ScoreSystemType Mismatch =
+                AllowMismatch ? Scoring.getMismatchPenalty(Seq1[i-1],Seq2[j-1])
+                              : std::numeric_limits<ScoreSystemType>::min();
+            //const ScoreSystemType Gap1 = Scoring.getGapPenalty(Seq1[i-1]);
+            //const ScoreSystemType Gap2 = Scoring.getGapPenalty(Seq2[j-1]);
+
             ScoreSystemType Diagonal =
                 (Seq1[i - 1] == Seq2[j - 1])
                     ? (Matrix[(i - 1) * NumCols + j - 1] + Match)
@@ -138,19 +169,28 @@ private:
         }
       }
     }
+
+    /*
+    for (unsigned i = 0; i < NumRows; i++) {
+      for (unsigned j = 0; j < NumCols; j++) {
+      llvm::errs() << Matrix[i*NumCols + j] << " ";
+      }
+      llvm::errs() << "\n";
+    }
+    */
   }
 
   void buildResult(ContainerType &Seq1, ContainerType &Seq2,
                    AlignedSequence<Ty, Blank> &Result) {
     auto &Data = Result.Data;
 
-    ScoringSystem &Scoring = BaseType::getScoring();
+    auto &Scoring = BaseType::getScoring();
     const ScoreSystemType Gap = Scoring.getGapPenalty();
-    const ScoreSystemType Match = Scoring.getMatchProfit();
+    //const ScoreSystemType Match = Scoring.getMatchProfit();
     const bool AllowMismatch = Scoring.getAllowMismatch();
-    const ScoreSystemType Mismatch =
-        AllowMismatch ? Scoring.getMismatchPenalty()
-                      : std::numeric_limits<ScoreSystemType>::min();
+    //const ScoreSystemType Mismatch =
+    //    AllowMismatch ? Scoring.getMismatchPenalty()
+    //                  : std::numeric_limits<ScoreSystemType>::min();
 
     int i = MatrixRows - 1, j = MatrixCols - 1;
 
@@ -169,6 +209,13 @@ private:
         } else {
           IsValidMatch = (Seq1[i - 1] == Seq2[j - 1]);
         }
+          const ScoreSystemType Match = Scoring.getMatchProfit(Seq1[i-1],Seq2[j-1]);
+          const ScoreSystemType Mismatch =
+              AllowMismatch ? Scoring.getMismatchPenalty(Seq1[i-1],Seq2[j-1])
+                            : std::numeric_limits<ScoreSystemType>::min();
+          //const ScoreSystemType Gap1 = Scoring.getGapPenalty(Seq1[i-1]);
+          //const ScoreSystemType Gap2 = Scoring.getGapPenalty(Seq2[j-1]);
+
 
         if (!IsValidMatch) {
           if (CurrentMatch > LongestMatch)
@@ -231,13 +278,14 @@ private:
   }
 
 public:
-  static ScoringSystem getDefaultScoring() { return ScoringSystem(-1, 2, -1); }
+  //static ScoringSystem getDefaultScoring() { return ScoringSystem(-1, 2, -1); }
 
-  NeedlemanWunschSA()
-      : BaseType(getDefaultScoring(), nullptr), Matrix(nullptr),
-        Matches(nullptr) {}
+  //NeedlemanWunschSA()
+  //    : BaseType(getDefaultScoring(), nullptr), Matrix(nullptr),
+  //      Matches(nullptr) {}
 
-  NeedlemanWunschSA(ScoringSystem Scoring, MatchFnTy Match = nullptr)
+
+  NeedlemanWunschSA(ScoreT Scoring, MatchFnTy Match = nullptr)
       : BaseType(Scoring, Match), Matrix(nullptr), Matches(nullptr) {}
 
   ~NeedlemanWunschSA() {clearAll();}

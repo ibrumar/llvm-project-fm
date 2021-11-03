@@ -191,7 +191,7 @@ private:
   const DataLayout *DL;
   LLVMContext *ContextPtr;
 
-  std::map<unsigned, int> OpcodeWeights;
+  std::map<unsigned, float> OpcodeWeights;
 
   // cache of linear functions
   // KeyValueCache<Function *, SmallVector<Value *, 8>> LFCache;
@@ -255,8 +255,8 @@ public:
   FunctionMergeResult merge(Function *F1, Function *F2, std::string Name = "",
                             const FunctionMergingOptions &Options = {});
 
-  void initOpcodeWeightsByName(std::map<std::string, int> &strOpcodeWeights);
-  int getOpcodeWeight(unsigned opcode);
+  void initOpcodeWeightsByName(std::map<std::string, float> &strOpcodeWeights);
+  float getOpcodeWeight(unsigned opcode);
 
   template <typename BlockListType> class CodeGenerator {
   private:
