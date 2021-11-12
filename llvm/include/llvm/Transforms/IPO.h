@@ -214,6 +214,7 @@ ModulePass *createMergeFunctionsPass();
 ///
 ModulePass *createFunctionMergingPass();
 ModulePass *createMergeSpecificFunctionsPass();
+ModulePass *createFMSAPass();
 
 //===----------------------------------------------------------------------===//
 /// createHotColdSplittingPass - This pass outlines cold blocks into a separate

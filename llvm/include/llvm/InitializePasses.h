@@ -162,6 +162,7 @@ void initializeFlattenCFGPassPass(PassRegistry&);
 void initializeFloat2IntLegacyPassPass(PassRegistry&);
 void initializeForceFunctionAttrsLegacyPassPass(PassRegistry&);
 void initializeFunctionMergingLegacyPassPass(PassRegistry&);
+void initializeFMSALegacyPassPass(PassRegistry&);
 void initializeMergeSpecificFunctionsLegacyPassPass(PassRegistry&);
 void initializeForwardControlFlowIntegrityPass(PassRegistry&);
 void initializeFuncletLayoutPass(PassRegistry&);
