@@ -201,6 +201,13 @@ Pass *createReversePostOrderFunctionAttrsPass();
 ///
 ModulePass *createMergeFunctionsPass();
 
+/// createFunctionMergingPass - This pass merges similar functions to reduce
+/// code size.
+///
+ModulePass *createFunctionMergingPass();
+ModulePass *createMergeSpecificFunctionsPass();
+ModulePass *createFMSAPass();
+
 //===----------------------------------------------------------------------===//
 /// createPartialInliningPass - This pass inlines parts of functions.
 ///

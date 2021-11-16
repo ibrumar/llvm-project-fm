@@ -6616,7 +6616,7 @@ struct MergeSpecificFunctions : public ModulePass {
                 mergingInput2.push_back(&F);
                 for (auto &bb2 : F) {
                   nonalig_bbsf2.insert(&bb2);
-                  errs() << "The nonalig_bbsf1 adds bb " << GetValueName(&F) << "::";
+                  errs() << "The nonalig_bbsf2 adds bb " << GetValueName(&F) << "::";
                   errs() << bb2.getName() << "\n";
                 }
             } else
@@ -6664,7 +6664,6 @@ struct MergeSpecificFunctions : public ModulePass {
             }
             assert(bb2_tmp->getParent()->getName() == funcNames.first.substr(1));          
           }
-
           //Begin DBG
           OrderedBBs1.push_back(bb1);
           OrderedBBs2.push_back(bb2);
