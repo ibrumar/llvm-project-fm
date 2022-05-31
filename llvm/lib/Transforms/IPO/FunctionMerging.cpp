@@ -1700,8 +1700,8 @@ static void SetFunctionAttributes(Function *F1, Function *F2,
       MergedFunc->setPersonalityFn(PersonalityFn1);
     } else {
 #ifdef ENABLE_DEBUG_CODE
-      PersonalityFn1->dump();
-      PersonalityFn2->dump();
+//      PersonalityFn1->dump();
+//      PersonalityFn2->dump();
 #endif
       // errs() << "ERROR: different personality function!\n";
       if (Debug)
@@ -3071,29 +3071,29 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
         errs() << "1: ";
         if (isa<BasicBlock>(Entry.get(0)))
           errs() << "BB " << GetValueName(Entry.get(0)) << "\n";
-        else
-          Entry.get(0)->dump();
+//        else
+//          Entry.get(0)->dump();
         errs() << "2: ";
         if (isa<BasicBlock>(Entry.get(1)))
           errs() << "BB " << GetValueName(Entry.get(1)) << "\n";
-        else
-          Entry.get(1)->dump();
+//        else
+//          Entry.get(1)->dump();
         errs() << "----\n";
       } else {
         if (Entry.get(0)) {
           errs() << "1: ";
           if (isa<BasicBlock>(Entry.get(0)))
             errs() << "BB " << GetValueName(Entry.get(0)) << "\n";
-          else
-            Entry.get(0)->dump();
+//          else
+//            Entry.get(0)->dump();
           errs() << "2: -\n";
         } else if (Entry.get(1)) {
           errs() << "1: -\n";
           errs() << "2: ";
           if (isa<BasicBlock>(Entry.get(1)))
             errs() << "BB " << GetValueName(Entry.get(1)) << "\n";
-          else
-            Entry.get(1)->dump();
+//          else
+//            Entry.get(1)->dump();
         }
         errs() << "----\n";
       }
@@ -4124,11 +4124,11 @@ bool FunctionMerging::runImpl(
 #ifdef ENABLE_DEBUG_CODE
         if (Debug) {
           errs() << "F1:\n";
-          F1->dump();
+          //F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+          //F2->dump();
           errs() << "F1-F2:\n";
-          Result.getMergedFunction()->dump();
+          //Result.getMergedFunction()->dump();
         }
 #endif
       
