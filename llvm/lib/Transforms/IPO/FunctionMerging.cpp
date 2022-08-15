@@ -111,6 +111,9 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <cstdlib>
+#include <cstdio>
+#include <array>
 
 #include <cstdlib>
 #include <climits>
@@ -179,6 +182,10 @@ static cl::opt<bool>
 static cl::opt<bool>
     EnableHyFMNW("func-merging-hyfm-nw", cl::init(false), cl::Hidden,
                  cl::desc("Enable HyFM with the Needleman-Wunsch alignment"));
+
+static cl::opt<bool>
+    UsePythonScripts("func-merging-python", cl::init(false), cl::Hidden,
+                 cl::desc("Enable Python script"));
 
 static cl::opt<bool> EnableSALSSACoalescing(
     "func-merging-coalescing", cl::init(true), cl::Hidden,
@@ -1700,8 +1707,8 @@ static void SetFunctionAttributes(Function *F1, Function *F2,
       MergedFunc->setPersonalityFn(PersonalityFn1);
     } else {
 #ifdef ENABLE_DEBUG_CODE
-      PersonalityFn1->dump();
-      PersonalityFn2->dump();
+//      PersonalityFn1->dump();
+//      PersonalityFn2->dump();
 #endif
       // errs() << "ERROR: different personality function!\n";
       if (Debug)
@@ -2788,6 +2795,41 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
 #endif
 
   AlignedSequence<Value *> AlignedSeq;
+  if (UsePythonScripts) {
+    auto StoreFunc = [&](Function *F, std::string filename) {
+      std::ofstream ofs(filename, std::ios::out);
+      for (BasicBlock &BB : *F) {
+	ofs << reinterpret_cast<std::uintptr_t>(&BB) << "\n";
+        for (Instruction &I : BB) {
+	  ofs << I.getOpcode() << " " << reinterpret_cast<std::uintptr_t>(I.getType());
+          for (unsigned i = 0; i < I.getNumOperands(); i++) {
+            ofs << " " << I.getOperand(i)->getType();
+	  }
+          ofs << "\n";
+	}
+        ofs << "\n";
+      }
+    };
+    StoreFunc(F1,"f1.txt");
+    StoreFunc(F2,"f2.txt");
+
+    std::array<char, 128> buffer;
+    std::string result;
+
+    FILE *pipe = popen("python3 test.py f1.txt f2.txt cached.pkl", "r");
+    if (!pipe)
+    {
+        errs() << "Couldn't start command.\n";
+    }
+    while (fgets(buffer.data(), 128, pipe) != NULL) {
+        result += buffer.data();
+    }
+    auto returnCode = pclose(pipe);
+
+    //std::cout << result << std::endl;
+    //std::cout << returnCode << std::endl;
+
+  }
   if (EnableHyFMNW) { // HyFM [NW]
     AlignmentStats TotalAlignmentStats;
 
@@ -2848,39 +2890,61 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
         auto &BD1 = *BestIt;
         BasicBlock *BB1 = BD1.BB;
 
-        SmallVector<Value *, 8> BB1Vec;
-        SmallVector<Value *, 8> BB2Vec;
+        if (UsePythonScripts) {
+          std::array<char, 128> buffer;
+          std::string result;
 
-        BB1Vec.push_back(BB1);
-        for (auto &I : *BB1)
-          if (!isa<PHINode>(&I) && !isa<LandingPadInst>(&I))
-            BB1Vec.push_back(&I);
+	  std::string cmd = "python3 align.py cached.pkl ";
+	  cmd += std::to_string(reinterpret_cast<std::uintptr_t>(BB1));
+	  cmd += " ";
+	  cmd += std::to_string(reinterpret_cast<std::uintptr_t>(BB2));
 
-        BB2Vec.push_back(BB2);
-        for (auto &I : *BB2)
-          if (!isa<PHINode>(&I) && !isa<LandingPadInst>(&I))
-            BB2Vec.push_back(&I);
+          FILE *pipe = popen(cmd.c_str(), "r");
+          if (!pipe)
+          {
+              errs() << "Couldn't start command.\n";
+          }
+          while (fgets(buffer.data(), 128, pipe) != NULL) {
+              result += buffer.data();
+          }
+          auto returnCode = pclose(pipe);
+	  errs() << result << "\n";
 
-        WeightFunction WeightFn(OpcodeWeights);
-	ScoringSystem<Value*,WeightFunction> Scoring(-1, 1, WeightFn);
-	NeedlemanWunschSA<ScoringSystem<Value*,WeightFunction>,SmallVectorImpl<Value *>> SA(Scoring, FunctionMerger::match);
+	} else {
+          SmallVector<Value *, 8> BB1Vec;
+          SmallVector<Value *, 8> BB2Vec;
 
-        auto MemReq = SA.getMemoryRequirement(BB1Vec, BB2Vec);
-        if (Verbose)
-          errs() << "PStats: " << BB1Vec.size() << " , " << BB2Vec.size() << " , " << MemReq << "\n";
+          BB1Vec.push_back(BB1);
+          for (auto &I : *BB1)
+            if (!isa<PHINode>(&I) && !isa<LandingPadInst>(&I))
+              BB1Vec.push_back(&I);
 
-        if (MemReq > MaxMem) {
-          MaxMem = MemReq;
-          B1Max = BB1Vec.size();
-          B2Max = BB2Vec.size();
-        }
+          BB2Vec.push_back(BB2);
+          for (auto &I : *BB2)
+            if (!isa<PHINode>(&I) && !isa<LandingPadInst>(&I))
+              BB2Vec.push_back(&I);
 
-        AlignedSequence<Value *> AlignedBlocks = SA.getAlignment(BB1Vec, BB2Vec);
+          WeightFunction WeightFn(OpcodeWeights);
+	  ScoringSystem<Value*,WeightFunction> Scoring(-1, 1, WeightFn);
+	  NeedlemanWunschSA<ScoringSystem<Value*,WeightFunction>,SmallVectorImpl<Value *>> SA(Scoring, FunctionMerger::match);
 
-        if (!HyFMProfitability || isSAProfitable(AlignedBlocks)) {
-          extendAlignedSeq(AlignedSeq, AlignedBlocks, TotalAlignmentStats);
-          Blocks.erase(BestIt);
-          MergedBlock = true;
+          auto MemReq = SA.getMemoryRequirement(BB1Vec, BB2Vec);
+          if (Verbose)
+            errs() << "PStats: " << BB1Vec.size() << " , " << BB2Vec.size() << " , " << MemReq << "\n";
+
+          if (MemReq > MaxMem) {
+            MaxMem = MemReq;
+            B1Max = BB1Vec.size();
+            B2Max = BB2Vec.size();
+          }
+
+          AlignedSequence<Value *> AlignedBlocks = SA.getAlignment(BB1Vec, BB2Vec);
+
+          if (!HyFMProfitability || isSAProfitable(AlignedBlocks)) {
+            extendAlignedSeq(AlignedSeq, AlignedBlocks, TotalAlignmentStats);
+            Blocks.erase(BestIt);
+            MergedBlock = true;
+          }
         }
       }
 
@@ -3004,7 +3068,6 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     }
     
     AlignedSeq = SA.getAlignment(F1Vec, F2Vec);
-
   }
 
 #ifdef TIME_STEPS_DEBUG
@@ -3071,29 +3134,29 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
         errs() << "1: ";
         if (isa<BasicBlock>(Entry.get(0)))
           errs() << "BB " << GetValueName(Entry.get(0)) << "\n";
-        else
-          Entry.get(0)->dump();
+//        else
+//          Entry.get(0)->dump();
         errs() << "2: ";
         if (isa<BasicBlock>(Entry.get(1)))
           errs() << "BB " << GetValueName(Entry.get(1)) << "\n";
-        else
-          Entry.get(1)->dump();
+//        else
+//          Entry.get(1)->dump();
         errs() << "----\n";
       } else {
         if (Entry.get(0)) {
           errs() << "1: ";
           if (isa<BasicBlock>(Entry.get(0)))
             errs() << "BB " << GetValueName(Entry.get(0)) << "\n";
-          else
-            Entry.get(0)->dump();
+//          else
+//            Entry.get(0)->dump();
           errs() << "2: -\n";
         } else if (Entry.get(1)) {
           errs() << "1: -\n";
           errs() << "2: ";
           if (isa<BasicBlock>(Entry.get(1)))
             errs() << "BB " << GetValueName(Entry.get(1)) << "\n";
-          else
-            Entry.get(1)->dump();
+//          else
+//            Entry.get(1)->dump();
         }
         errs() << "----\n";
       }
@@ -4124,11 +4187,11 @@ bool FunctionMerging::runImpl(
 #ifdef ENABLE_DEBUG_CODE
         if (Debug) {
           errs() << "F1:\n";
-          F1->dump();
+          //F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+          //F2->dump();
           errs() << "F1-F2:\n";
-          Result.getMergedFunction()->dump();
+          //Result.getMergedFunction()->dump();
         }
 #endif
       

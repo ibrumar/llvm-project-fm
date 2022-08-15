@@ -3553,13 +3553,13 @@ mergeBySequenceAlignmentBackend(Function *F1, Function *F2,
         errs() << "1: ";
         if (isa<BasicBlock>(Pair.first))
           errs() << "BB " << GetValueName(Pair.first) << "\n";
-        else
-          Pair.first->dump();
+//        else
+//          Pair.first->dump();
         errs() << "2: ";
         if (isa<BasicBlock>(Pair.second))
           errs() << "BB " << GetValueName(Pair.second) << "\n";
-        else
-          Pair.second->dump();
+//        else
+//          Pair.second->dump();
         errs() << "----\n";
 
       } else {
@@ -3568,16 +3568,16 @@ mergeBySequenceAlignmentBackend(Function *F1, Function *F2,
           errs() << "1: ";
           if (isa<BasicBlock>(Pair.first))
             errs() << "BB " << GetValueName(Pair.first) << "\n";
-          else
-            Pair.first->dump();
+//          else
+//            Pair.first->dump();
           errs() << "2: -\n";
         } else if (Pair.second) {
           errs() << "1: -\n";
           errs() << "2: ";
           if (isa<BasicBlock>(Pair.second))
             errs() << "BB " << GetValueName(Pair.second) << "\n";
-          else
-            Pair.second->dump();
+//          else
+//            Pair.second->dump();
         }
         errs() << "----\n";
       }
@@ -3846,8 +3846,8 @@ mergeBySequenceAlignmentBackend(Function *F1, Function *F2,
       MergedFunc->setPersonalityFn(PersonalityFn1);
     } else {
 #ifdef ENABLE_DEBUG_CODE
-      PersonalityFn1->dump();
-      PersonalityFn2->dump();
+//      PersonalityFn1->dump();
+//      PersonalityFn2->dump();
 #endif
       errs() << "ERROR: different personality function!\n";
     }
@@ -4432,9 +4432,9 @@ mergeBySequenceAlignmentBackend(Function *F1, Function *F2,
                       errs() << "Should have two LandingPadInst as per the "
                                 "BasicBlock match!\n";
 #ifdef ENABLE_DEBUG_CODE
-                      I1->dump();
-                      I2->dump();
-                      NewI->dump();
+//                      I1->dump();
+//                      I2->dump();
+//                      NewI->dump();
 #endif
                       MergedFunc->eraseFromParent();
                       return ErrorResponse;
@@ -4891,11 +4891,11 @@ bool replaceCallsWith(Module *M, Function *F, MergedFunction &MergedFunc) {
         if (Verbose) {
           errs() << "ERROR: Function Call has uses\n";
 #ifdef ENABLE_DEBUG_CODE
-          CI->dump();
+//          CI->dump();
           errs() << "Called type\n";
-          F->getReturnType()->dump();
+//          F->getReturnType()->dump();
           errs() << "Merged type\n";
-          MergedF->getReturnType()->dump();
+//          MergedF->getReturnType()->dump();
 #endif
         }
       }
@@ -5916,12 +5916,12 @@ bool FMSALegacyPass::runOnModule(Module &M) {
 #ifdef ENABLE_DEBUG_CODE
         if (Verbose) {
           if (Result.MergedFunc != nullptr) {
-            Result.MergedFunc->dump();
+            //Result.MergedFunc->dump();
           }
           errs() << "F1:\n";
-          F1->dump();
+          //F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+          //F2->dump();
         }
 #endif
         Result.MergedFunc->eraseFromParent();
@@ -6003,11 +6003,11 @@ bool FMSALegacyPass::runOnModule(Module &M) {
 #ifdef ENABLE_DEBUG_CODE
         if (Verbose) {
           errs() << "F1:\n";
-          F1->dump();
+          //F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+          //F2->dump();
           errs() << "F1-F2:\n";
-          Result.MergedFunc->dump();
+          //Result.MergedFunc->dump();
         }
 #endif
 
@@ -6143,12 +6143,12 @@ bool FMSALegacyPass::runOnModule(Module &M) {
 #ifdef ENABLE_DEBUG_CODE
         if (Verbose) {
           if (Result.MergedFunc != nullptr) {
-            Result.MergedFunc->dump();
+            //Result.MergedFunc->dump();
           }
           errs() << "F1:\n";
-          F1->dump();
+//          F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+//          F2->dump();
         }
 #endif
         Result.MergedFunc->eraseFromParent();
@@ -6226,11 +6226,11 @@ bool FMSALegacyPass::runOnModule(Module &M) {
 #ifdef ENABLE_DEBUG_CODE
         if (Verbose) {
           errs() << "F1:\n";
-          F1->dump();
+          //F1->dump();
           errs() << "F2:\n";
-          F2->dump();
+          //F2->dump();
           errs() << "F1-F2:\n";
-          Result.MergedFunc->dump();
+          //Result.MergedFunc->dump();
         }
 #endif
 
