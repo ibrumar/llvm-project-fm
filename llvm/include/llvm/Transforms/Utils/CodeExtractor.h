@@ -20,6 +20,10 @@
 #include "llvm/ADT/SetVector.h"
 #include <limits>
 
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Instruction.h"
+#include "llvm/IR/Instructions.h"
+
 namespace llvm {
 
 class BasicBlock;
@@ -92,7 +96,7 @@ class Value;
     ///
     /// Returns zero when called on a CodeExtractor instance where isEligible
     /// returns false.
-    Function *extractCodeRegion();
+    std::pair<Function *, CallInst*> extractCodeRegion();
 
     /// Test whether this code extractor is eligible.
     ///
@@ -158,7 +162,8 @@ class Value;
     void emitCallAndSwitchStatement(Function *newFunction,
                                     BasicBlock *newHeader,
                                     ValueSet &inputs,
-                                    ValueSet &outputs);
+                                    ValueSet &outputs,
+                                    CallInst *CI);
   };
 
 } // end namespace llvm

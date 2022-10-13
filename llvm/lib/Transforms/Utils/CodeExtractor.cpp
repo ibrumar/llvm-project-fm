@@ -68,6 +68,8 @@
 using namespace llvm;
 using ProfileCount = Function::ProfileCount;
 
+static LLVMContext TheContext;
+
 #define DEBUG_TYPE "code-extractor"
 
 // Provide a command-line option to aggregate function arguments into a struct
@@ -1116,7 +1118,8 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
   errs() << "header you're looking at is " << header->getName() << "\n"; 
   errs() << "isEligible=" << isEligible() << "\n";
   if (!isEligible()) {
-    return nullptr;
+    return std::pair<Function *, CallInst *>(NULL, NULL);
+    //return nullptr;
   }
 
   // Assumption: this is a single-entry code region, and the header is the first
@@ -1139,7 +1142,8 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
         continue;
       if (llvm::any_of(BB, containsVarArgIntrinsic)) {
         errs() << "Exit 3\n";
-        return nullptr;
+        return std::pair<Function *, CallInst *>(NULL, NULL);
+        //return nullptr;
       }
     }
   }
@@ -1294,5 +1298,5 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
 
   LLVM_DEBUG(if (verifyFunction(*newFunction))
                  report_fatal_error("verifyFunction failed!"));
-  return newFunction;
+  return std::pair<Function *, CallInst *>(newFunction, CI);
 }
