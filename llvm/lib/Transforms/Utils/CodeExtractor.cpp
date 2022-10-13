@@ -821,7 +821,7 @@ Function *CodeExtractor::constructFunction(const ValueSet &inputs,
 /// necessary.
 void CodeExtractor::
 emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
-                           ValueSet &inputs, ValueSet &outputs) {
+                           ValueSet &inputs, ValueSet &outputs, CallInst *call) {
   // Emit a call to the new function, passing in: *pointer to struct (if
   // aggregating parameters), or plan inputs and allocated memory for outputs
   std::vector<Value *> params, StructValues, ReloadOutputs, Reloads;
@@ -879,7 +879,8 @@ emitCallAndSwitchStatement(Function *newFunction, BasicBlock *codeReplacer,
   }
 
   // Emit the call to the function
-  CallInst *call = CallInst::Create(newFunction, params,
+  //CallInst *call = CallInst::Create(newFunction, params,
+  call = CallInst::Create(newFunction, params,
                                     NumExitBlocks > 1 ? "targetBlock" : "");
   // Add debug location to the new call, if the original function has debug
   // info. In that case, the terminator of the entry block of the extracted
@@ -1107,14 +1108,19 @@ void CodeExtractor::calculateNewCallTerminatorWeights(
       MDBuilder(TI->getContext()).createBranchWeights(BranchWeights));
 }
 
-Function *CodeExtractor::extractCodeRegion() {
-  if (!isEligible())
+std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
+  
+  BasicBlock *header = *Blocks.begin();
+  Function *oldFunction = header->getParent();
+  errs() << "func you're looking at is " << header->getParent()->getName() << "\n"; 
+  errs() << "header you're looking at is " << header->getName() << "\n"; 
+  errs() << "isEligible=" << isEligible() << "\n";
+  if (!isEligible()) {
     return nullptr;
+  }
 
   // Assumption: this is a single-entry code region, and the header is the first
   // block in the region.
-  BasicBlock *header = *Blocks.begin();
-  Function *oldFunction = header->getParent();
 
   // For functions with varargs, check that varargs handling is only done in the
   // outlined function, i.e vastart and vaend are only used in outlined blocks.
@@ -1124,14 +1130,17 @@ Function *CodeExtractor::extractCodeRegion() {
         if (const Function *F = CI->getCalledFunction())
           return F->getIntrinsicID() == Intrinsic::vastart ||
                  F->getIntrinsicID() == Intrinsic::vaend;
+      errs() << "Exit 2\n";
       return false;
     };
 
     for (auto &BB : *oldFunction) {
       if (Blocks.count(&BB))
         continue;
-      if (llvm::any_of(BB, containsVarArgIntrinsic))
+      if (llvm::any_of(BB, containsVarArgIntrinsic)) {
+        errs() << "Exit 3\n";
         return nullptr;
+      }
     }
   }
   ValueSet inputs, outputs, SinkingCands, HoistingCands;
@@ -1174,9 +1183,12 @@ Function *CodeExtractor::extractCodeRegion() {
   if (oldFunction->getSubprogram()) {
     any_of(Blocks, [&BranchI](const BasicBlock *BB) {
       return any_of(*BB, [&BranchI](const Instruction &I) {
-        if (!I.getDebugLoc())
+        if (!I.getDebugLoc()) {
+          errs() << "Exit 3\n";
           return false;
+        }
         BranchI->setDebugLoc(I.getDebugLoc());
+        errs() << "Exit 4\n";
         return true;
       });
     });
@@ -1235,7 +1247,9 @@ Function *CodeExtractor::extractCodeRegion() {
     BFI->setBlockFreq(codeReplacer, EntryFreq.getFrequency());
   }
 
-  emitCallAndSwitchStatement(newFunction, codeReplacer, inputs, outputs);
+
+  CallInst *CI;
+  emitCallAndSwitchStatement(newFunction, codeReplacer, inputs, outputs, CI);
 
   moveCodeToFunction(newFunction);
 

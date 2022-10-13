@@ -3486,9 +3486,9 @@ static int RequiresOriginalInterfaces(FunctionMergeResult &MFR,
 void FunctionMerger::updateCallGraph(Function *F, FunctionMergeResult &MFR,
                                      StringSet<> &AlwaysPreserved,
                                      const FunctionMergingOptions &Options) {
-  replaceByCall(F, MFR, Options);
-  if (!RequiresOriginalInterface(F, MFR, AlwaysPreserved)) {
-    bool CanErase = replaceCallsWith(F, MFR, Options);
+  replaceByCall(F, MFR, Options); //replacing the body of the func by a call to the merged one
+  /*if (!RequiresOriginalInterface(F, MFR, AlwaysPreserved)) {
+    bool CanErase = replaceCallsWith(F, MFR, Options); //we can remove this one as well
     CanErase = CanErase && F->use_empty();
     CanErase = CanErase &&
                (AlwaysPreserved.find(F->getName()) == AlwaysPreserved.end());
@@ -3496,9 +3496,9 @@ void FunctionMerger::updateCallGraph(Function *F, FunctionMergeResult &MFR,
       CanErase = CanErase && !ShouldPreserveGV(F);
       CanErase = CanErase && F->isDiscardableIfUnused();
     }
-    if (CanErase)
-      F->eraseFromParent();
-  }
+    //if (CanErase)
+    //  F->eraseFromParent();
+  }*/
 }
 
 void FunctionMerger::updateCallGraph(FunctionMergeResult &MFR,
