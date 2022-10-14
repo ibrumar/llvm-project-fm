@@ -1135,7 +1135,7 @@ bool PartialInlinerImpl::FunctionCloner::doMultiRegionFunctionOutlining() {
     if (Outputs.size() > 0 && !ForceLiveExit)
       continue;
 
-    Function *OutlinedFunc = CE.extractCodeRegion();
+    Function *OutlinedFunc = CE.extractCodeRegion().first;
 
     if (OutlinedFunc) {
       CallSite OCS = PartialInlinerImpl::getOneCallSiteTo(OutlinedFunc);
@@ -1201,7 +1201,7 @@ PartialInlinerImpl::FunctionCloner::doSingleRegionFunctionOutlining() {
       CodeExtractor(ToExtract, &DT, /*AggregateArgs*/ false,
                     ClonedFuncBFI.get(), &BPI,
                     /* AllowVarargs */ true)
-          .extractCodeRegion();
+          .extractCodeRegion().first;
 
   if (OutlinedFunc) {
     BasicBlock *OutliningCallBB =

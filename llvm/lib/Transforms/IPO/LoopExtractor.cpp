@@ -65,11 +65,11 @@ namespace {
         Type *ShortTy = IntegerType::getInt16Ty(M.getContext());
         Type *CharTy = IntegerType::getInt8Ty(M.getContext());
         
-        M.getOrInsertFunction("__captureOriginalIntPtrVal", VoidTy, IntPtrTy, ParamIdxTy, NULL);
-        M.getOrInsertFunction("__captureOriginalShortPtrVal", VoidTy, ShortPtrTy, ParamIdxTy, NULL);
-        M.getOrInsertFunction("__captureOriginalCharPtrVal", VoidTy, CharPtrTy, ParamIdxTy, NULL);
-        M.getOrInsertFunction("__captureOriginalFloatPtrVal", VoidTy, FloatPtrTy, ParamIdxTy, NULL);
-        M.getOrInsertFunction("__captureOriginalDoublePtrVal", VoidTy, DoublePtrTy, ParamIdxTy, NULL);
+        M.getOrInsertFunction("__captureOriginalIntPtrVal", VoidTy, IntPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalShortPtrVal", VoidTy, ShortPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalCharPtrVal", VoidTy, CharPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalFloatPtrVal", VoidTy, FloatPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalDoublePtrVal", VoidTy, DoublePtrTy, ParamIdxTy);
 
         typeToFuncPtr[std::pair<const Type *, bool>(IntPtrTy, false)] = M.getFunction("__captureOriginalIntPtrVal");
         typeToFuncPtr[std::pair<const Type *, bool>(ShortPtrTy, false)]  = M.getFunction("__captureOriginalShortPtrVal");
@@ -77,29 +77,36 @@ namespace {
         typeToFuncPtr[std::pair<const Type *, bool>(FloatPtrTy, false)]  = M.getFunction("__captureOriginalFloatPtrVal");
         typeToFuncPtr[std::pair<const Type *, bool>(DoublePtrTy, false)] = M.getFunction("__captureOriginalDoublePtrVal");
         
-        //For allocas and scalars that are output from the extracted region
         /*
-        M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, IntPtrTy, ParamIdxTy, SizeTy, NULL);
-        M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, ShortPtrTy, ParamIdxTy, SizeTy, NULL);
-        M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, CharPtrTy, ParamIdxTy, SizeTy, NULL);
-        M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, FloatPtrTy, ParamIdxTy, SizeTy, NULL);
-        M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, DoublePtrTy, ParamIdxTy, SizeTy, NULL);*/
+        //For allocas and scalars that are output from the extracted region
+        
+        M.getOrInsertFunction("__captureIntPtrValWithSize", VoidTy, IntPtrTy, ParamIdxTy, SizeTy);
+        M.getOrInsertFunction("__captureShortPtrValWithSize", VoidTy, ShortPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureCharPtrValWithSize", VoidTy, CharPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureFloatPtrValWithSize", VoidTy, FloatPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureDoublePtrValWithSize", VoidTy, DoublePtrTy, ParamIdxTy, SizeTy, NULL);
 
 
-         M.getOrInsertFunction("__captureOriginalFloatVal", VoidTy, FloatTy, ParamIdxTy, NULL);
-         M.getOrInsertFunction("__captureOriginalDoubleVal", VoidTy, DoubleTy, ParamIdxTy, NULL);
-         M.getOrInsertFunction("__captureOriginalIntegerVal", VoidTy, IntegerTy, ParamIdxTy, NULL);
-         M.getOrInsertFunction("__captureOriginalShortVal", VoidTy, ShortTy, ParamIdxTy, NULL);
-         M.getOrInsertFunction("__captureOriginalCharVal", VoidTy, CharTy, ParamIdxTy, NULL);
-         
-         typeToFuncPtr[std::pair<const Type *, bool>(FloatTy, false)] = M.getFunction("__captureOriginalFloatVal");
-         typeToFuncPtr[std::pair<const Type *, bool>(DoubleTy, false)] = M.getFunction("__captureOriginalDoubleVal"); 
-         typeToFuncPtr[std::pair<const Type *, bool>(IntegerTy, false)] = M.getFunction("__captureOriginalIntegerVal");     
-         typeToFuncPtr[std::pair<const Type *, bool>(ShortTy, false)] = M.getFunction("__captureOriginalShortVal");
-         typeToFuncPtr[std::pair<const Type *, bool>(CharTy, false)] = M.getFunction("__captureOriginalCharVal");
-         
-         M.getOrInsertFunction("__createTbXml", VoidTy, NULL);
-         CreateTbXmlFunc = M.getFunction("__createTbXml");
+        typeToFuncPtr[std::pair<const Type *, bool>(FloatTy, true)] = M.getFunction("__captureFloatVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(DoubleTy, true)] = M.getFunction("__captureDoubleVal"); 
+        typeToFuncPtr[std::pair<const Type *, bool>(IntegerTy, true)] = M.getFunction("__captureIntegerVal");     
+        typeToFuncPtr[std::pair<const Type *, bool>(ShortTy, true)] = M.getFunction("__captureShortVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(CharTy, true)] = M.getFunction("__captureCharVal");
+        */
+
+        M.getOrInsertFunction("__captureOriginalFloatVal", VoidTy, FloatTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalDoubleVal", VoidTy, DoubleTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalIntegerVal", VoidTy, IntegerTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalShortVal", VoidTy, ShortTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalCharVal", VoidTy, CharTy, ParamIdxTy);
+        typeToFuncPtr[std::pair<const Type *, bool>(FloatTy, false)] = M.getFunction("__captureOriginalFloatVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(DoubleTy, false)] = M.getFunction("__captureOriginalDoubleVal"); 
+        typeToFuncPtr[std::pair<const Type *, bool>(IntegerTy, false)] = M.getFunction("__captureOriginalIntegerVal");     
+        typeToFuncPtr[std::pair<const Type *, bool>(ShortTy, false)] = M.getFunction("__captureOriginalShortVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(CharTy, false)] = M.getFunction("__captureOriginalCharVal");
+        
+        M.getOrInsertFunction("__createTbXml", VoidTy, NULL);
+        CreateTbXmlFunc = M.getFunction("__createTbXml");
         //END LEI
     
     }
@@ -225,12 +232,15 @@ bool LoopExtractor::runOnLoop(Loop *L, LPPassManager &LPM) {
       //ExtractedFuncAndCI.second->insertBefore;
       IRBuilder<> Builder(ExtractedFuncAndCI.second); //adding the call instruction as an insertion point
 
-      Function *CF = ExtractedFuncAndCI.second->getCalledFunction();
-      
+      //Function *CF = ExtractedFuncAndCI.second->getCalledFunction();
+      CallInst *CI = ExtractedFuncAndCI.second;
       //for (auto& A : CF->getArgumentList()) {
-      for (auto *A : ExtractedFuncAndCI.second->args()) {
-        //Not sure if we need to distinguish arguments for being pointers or scalars
-        Builder.CreateCall(typeToFuncPtr[std::pair<Type*, bool>(A->getType(), false)], A);
+      //for (auto *A : ExtractedFuncAndCI.second->args()) {
+      //  //Not sure if we need to distinguish arguments for being pointers or scalars
+      //}
+      for (int i = 0; i<CI->getNumArgOperands(); i++) {
+          Value *Arg = CI->getArgOperand(i);
+          Builder.CreateCall(typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)], Arg);
       }
       
       //LEI end
