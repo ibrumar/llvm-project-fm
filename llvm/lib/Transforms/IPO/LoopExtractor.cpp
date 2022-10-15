@@ -214,15 +214,19 @@ bool LoopExtractor::runOnLoop(Loop *L, LPPassManager &LPM) {
         break;
       }
   }
-
+  errs() << "ShouldExtractLoopNew A = " << ShouldExtractLoop << "\n";
   if (ShouldExtractLoop) {
+    errs() << "NumLoops B = " << NumLoops << "\n";
     if (NumLoops == 0) return Changed;
     --NumLoops;
     CodeExtractor Extractor(DT, *L);
     //LEI modification
     std::pair<Function *, CallInst *> ExtractedFuncAndCI = Extractor.extractCodeRegion(); //NEWLINE LEI
+    errs() << "Reaching this point2\n";
     if (ExtractedFuncAndCI.first != nullptr) { //LEI modification end
       Changed = true;
+
+      Function *parentFunc = L->getHeader()->getParent();
       // After extraction, the loop is replaced by a function call, so
       // we shouldn't try to run any more loop passes on it.
       LPM.markLoopAsDeleted(*L);
@@ -230,19 +234,37 @@ bool LoopExtractor::runOnLoop(Loop *L, LPPassManager &LPM) {
       //LEI modification
       
       //ExtractedFuncAndCI.second->insertBefore;
-      IRBuilder<> Builder(ExtractedFuncAndCI.second); //adding the call instruction as an insertion point
+      //Most likely that instruction doesn't exist anymore so the builder cannot be created there. Try to create the instrumentation
+      //at some other point
 
-      //Function *CF = ExtractedFuncAndCI.second->getCalledFunction();
-      CallInst *CI = ExtractedFuncAndCI.second;
-      //for (auto& A : CF->getArgumentList()) {
-      //for (auto *A : ExtractedFuncAndCI.second->args()) {
-      //  //Not sure if we need to distinguish arguments for being pointers or scalars
-      //}
-      for (int i = 0; i<CI->getNumArgOperands(); i++) {
-          Value *Arg = CI->getArgOperand(i);
-          Builder.CreateCall(typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)], Arg);
+      Function *CF = ExtractedFuncAndCI.first;
+      //CallInst *CI = ExtractedFuncAndCI.second;
+      CallInst *CI = nullptr;
+      for (auto &BB : *parentFunc) {
+        for (auto &II : BB) {
+          CI = dyn_cast<CallInst>(&II);
+          if (CI and CI->getCalledFunction() == CF)
+            break;
+        }
+        if (CI and CI->getCalledFunction() == CF)
+          break;
       }
-      
+      errs() << "The condition to break the loop is fulfilled " << (CI != nullptr) << " " << "\n";
+      if (CI != nullptr) {
+        errs() << "The condition to break the loop is fulfilled " << (CI->getCalledFunction() == CF) << "\n";
+        IRBuilder<> Builder(parentFunc->getContext()); //adding the call instruction as an insertion point
+        Builder.SetInsertPoint(CI);
+        //for (auto& A : CF->getArgumentList()) {
+        //for (auto *A : ExtractedFuncAndCI.second->args()) {
+        //  //Not sure if we need to distinguish arguments for being pointers or scalars
+        //}
+        errs() << "Reaching this point\n";
+        for (int i = 0; i<CI->getNumArgOperands(); i++) {
+            Value *Arg = CI->getArgOperand(i);
+            errs() << "Creating a call to instr func " << typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)]->getName() << "\n";
+            Builder.CreateCall(typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)], Arg);
+        }
+      }
       //LEI end
     }
     ++NumExtracted;

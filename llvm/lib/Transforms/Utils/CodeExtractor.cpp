@@ -1117,10 +1117,9 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
   errs() << "func you're looking at is " << header->getParent()->getName() << "\n"; 
   errs() << "header you're looking at is " << header->getName() << "\n"; 
   errs() << "isEligible=" << isEligible() << "\n";
-  if (!isEligible()) {
-    return std::pair<Function *, CallInst *>(NULL, NULL);
-    //return nullptr;
-  }
+  auto nullPtrRet = std::pair<Function *, CallInst *>(nullptr, nullptr);
+  if (!isEligible())
+    return nullPtrRet;
 
   // Assumption: this is a single-entry code region, and the header is the first
   // block in the region.
@@ -1134,6 +1133,7 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
           return F->getIntrinsicID() == Intrinsic::vastart ||
                  F->getIntrinsicID() == Intrinsic::vaend;
       errs() << "Exit 2\n";
+      //return nullPtrRet;
       return false;
     };
 
@@ -1142,7 +1142,7 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
         continue;
       if (llvm::any_of(BB, containsVarArgIntrinsic)) {
         errs() << "Exit 3\n";
-        return std::pair<Function *, CallInst *>(NULL, NULL);
+        return nullPtrRet;
         //return nullptr;
       }
     }
@@ -1295,7 +1295,7 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
           }
         }
     }
-
+  errs() << "Managed to peform the extraction\n";
   LLVM_DEBUG(if (verifyFunction(*newFunction))
                  report_fatal_error("verifyFunction failed!"));
   return std::pair<Function *, CallInst *>(newFunction, CI);
