@@ -1,4 +1,5 @@
 add_llvm_library(LLVMInstrumentation
+  InstrumentExtractedLoops.cpp
   AddressSanitizer.cpp
   BoundsChecking.cpp
   CGProfile.cpp

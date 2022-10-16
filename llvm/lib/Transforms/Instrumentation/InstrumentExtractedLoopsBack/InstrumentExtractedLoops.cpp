@@ -85,37 +85,9 @@ using namespace llvm;
 namespace {
   class InstrumentExtractedLoopsLegacyPass : public FunctionPass,
                                    public InstVisitor<InstrumentExtractedLoopsLegacyPass> {
-//    const DataLayout *TD;
-    IRBuilder<> *Builder;
-
-    PointerType *VoidPtrTy;
-    IntegerType *SizeTy;
-    IntegerType *IntegerTy;
-
-    PointerType *FloatTy = Type::getFloatTy(M.getContext());
-    PointerType *DoubleTy = Type::getDoubleTy(M.getContext());
-    IntegerType *ShortTy = IntegerType::getInt16Ty(M.getContext());
-    IntegerType *CharTy = IntegerType::getInt8Ty(M.getContext());
-
-    Function *captureOriginalValuesFunction;
-    Function *LoadCheckFunction;
-    Function *StoreCheckFunction;
-    Function *BasicBlockInstCountFunction;
-    Function *ReferenceFunction;
     
-    Function *startCallFunction;                         
-    Function *startFunction;                         
-    Function *startIntrinsic;
-    Function *endCallFunction;
-    Function *confirmInternalFunction;
-    Function *reportStatisticsFunction;
-    Function *mainFunction;
-    Function *exitFunction;
-    Module *currentModule;
-    Value *currentFunctionValue;
-    int bbCounter;
-
-    std::set<Function *> functionPtrs;
+    std::map<std::pair<const Type *, bool>, Function * > typeToFuncPtr;
+    Function *CreateTbXmlFunc;
   public:
     static char ID;
     InstrumentExtractedLoopsLegacyPass(): FunctionPass(ID) { }
@@ -130,83 +102,68 @@ namespace {
     }
 
 
-  void detectFunctionAnnotation(Module &M) {
-    if(GlobalVariable* GA = M.getGlobalVariable("llvm.global.annotations")) {
-      // the first operand holds the metadata
-      for (Value *AOp : GA->operands()) {
-        // all metadata are stored in an array of struct of metadata
-        if (ConstantArray *CA = dyn_cast<ConstantArray>(AOp)) {
-          // so iterate over the operands
-          for (Value *CAOp : CA->operands()) {
-            // get the struct, which holds a pointer to the annotated function
-            // as first field, and the annotation as second field
-            if (ConstantStruct *CS = dyn_cast<ConstantStruct>(CAOp)) {
-              if (CS->getNumOperands() >= 2) {
-                Function* AnnotatedFunction = cast<Function>(CS->getOperand(0)->getOperand(0));
-								errs() << "The function's name is " << AnnotatedFunction->getName() << "\n";
-                // the second field is a pointer to a global constant Array that holds the string
-                if (GlobalVariable *GAnn =
-                  dyn_cast<GlobalVariable>(CS->getOperand(1)->getOperand(0))) {
-                  if (ConstantDataArray *A =
-                    dyn_cast<ConstantDataArray>(GAnn->getOperand(0))) {
-                    // we have the annotation! Check it's an epona annotation and process
-                    StringRef AS = A->getAsString();
-                    errs() << "The function is annotated with " << AS << "\n";
-                    if (AS.startswith("referenceFunction")) {
-                    //  FuncAnnotations[AnnotatedFunction].emplace_back(AS);
-                        ReferenceFunction = AnnotatedFunction;
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-		}
-  }
 
   bool doInitialization(Module &M) {
-    Type *VoidTy = Type::getVoidTy(M.getContext());
-    VoidPtrTy = Type::getInt8PtrTy(M.getContext());
-    Type *CharPtrTy = Type::getInt8PtrTy(TheContext);
-    Type *ShortPtrTy = Type::getInt16PtrTy(TheContext);
-    Type *IntPtrTy = Type::getInt32PtrTy(TheContext);
-    SizeTy = IntegerType::getInt64Ty(M.getContext());
-    
-    FloatTy = Type::getFloatTy(M.getContext());
-    DoubleTy = Type::getDoubleTy(M.getContext());
-    IntegerTy = IntegerType::getInt32Ty(M.getContext());
-    ShortTy = IntegerType::getInt16Ty(M.getContext());
-    CharTy = IntegerType::getInt8Ty(M.getContext());
-    currentModule = &M;
-	  detectFunctionAnnotation(M);
+        /*START LEI*/
+        Type *VoidTy = Type::getVoidTy(M.getContext());
+        Type *VoidPtrTy = Type::getInt8PtrTy(M.getContext());
+        Type *CharPtrTy = Type::getInt8PtrTy(M.getContext());
+        Type *ShortPtrTy = Type::getInt16PtrTy(M.getContext());
+        Type *IntPtrTy = Type::getInt32PtrTy(M.getContext());
+        Type *FloatPtrTy = Type::getFloatPtrTy(M.getContext());
+        Type *DoublePtrTy = Type::getDoublePtrTy(M.getContext());
+        
+        Type *FloatTy = Type::getFloatTy(M.getContext());
+        Type *DoubleTy = Type::getDoubleTy(M.getContext());
+        Type *ParamIdxTy = IntegerType::getInt64Ty(M.getContext());
+        Type *SizeTy = IntegerType::getInt64Ty(M.getContext());
+        Type *IntegerTy = IntegerType::getInt32Ty(M.getContext());
+        Type *ShortTy = IntegerType::getInt16Ty(M.getContext());
+        Type *CharTy = IntegerType::getInt8Ty(M.getContext());
+        
+        M.getOrInsertFunction("__captureOriginalIntPtrVal", VoidTy, IntPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalShortPtrVal", VoidTy, ShortPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalCharPtrVal", VoidTy, CharPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalFloatPtrVal", VoidTy, FloatPtrTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalDoublePtrVal", VoidTy, DoublePtrTy, ParamIdxTy);
 
-    //create a map from Pointer or value type to function and then call the appropriate
-    //function
-    errs() << "Source file " + M.getSourceFileName() << "\n";
-    M.getOrInsertFunction("__captureOriginalPtrVal", VoidTy, IntPtrTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrVal", VoidTy, ShortPtrTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrVal", VoidTy, CharPtrTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrVal", VoidTy, FloatPtrTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrVal", VoidTy, DoublePtrTy, SizeTy, NULL);
+        typeToFuncPtr[std::pair<const Type *, bool>(IntPtrTy, false)] = M.getFunction("__captureOriginalIntPtrVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(ShortPtrTy, false)]  = M.getFunction("__captureOriginalShortPtrVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(CharPtrTy, false)] = M.getFunction("__captureOriginalCharPtrVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(FloatPtrTy, false)]  = M.getFunction("__captureOriginalFloatPtrVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(DoublePtrTy, false)] = M.getFunction("__captureOriginalDoublePtrVal");
+        
+        /*
+        //For allocas and scalars that are output from the extracted region
+        
+        M.getOrInsertFunction("__captureIntPtrValWithSize", VoidTy, IntPtrTy, ParamIdxTy, SizeTy);
+        M.getOrInsertFunction("__captureShortPtrValWithSize", VoidTy, ShortPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureCharPtrValWithSize", VoidTy, CharPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureFloatPtrValWithSize", VoidTy, FloatPtrTy, ParamIdxTy, SizeTy, NULL);
+        M.getOrInsertFunction("__captureDoublePtrValWithSize", VoidTy, DoublePtrTy, ParamIdxTy, SizeTy, NULL);
 
-    //For allocas and scalars that are output from the extracted region
-    M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, IntPtrTy, SizeTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, ShortPtrTy, SizeTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, CharPtrTy, SizeTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, FloatPtrTy, SizeTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalPtrValWithSize", VoidTy, DoublePtrTy, SizeTy, SizeTy, NULL);
 
-    M.getOrInsertFunction("__captureOriginalVal", VoidTy, FloatTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalVal", VoidTy, DoubleTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalVal", VoidTy, IntegerTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalVal", VoidTy, ShortTy, SizeTy, NULL);
-    M.getOrInsertFunction("__captureOriginalVal", VoidTy, CharTy, SizeTy, NULL);
-    M.getOrInsertFunction("__createTbXml", VoidTy, NULL);
-    errs() << "got to this point 2a \n";
+        typeToFuncPtr[std::pair<const Type *, bool>(FloatTy, true)] = M.getFunction("__captureFloatVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(DoubleTy, true)] = M.getFunction("__captureDoubleVal"); 
+        typeToFuncPtr[std::pair<const Type *, bool>(IntegerTy, true)] = M.getFunction("__captureIntegerVal");     
+        typeToFuncPtr[std::pair<const Type *, bool>(ShortTy, true)] = M.getFunction("__captureShortVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(CharTy, true)] = M.getFunction("__captureCharVal");
+        */
 
-    return true;
+        M.getOrInsertFunction("__captureOriginalFloatVal", VoidTy, FloatTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalDoubleVal", VoidTy, DoubleTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalIntegerVal", VoidTy, IntegerTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalShortVal", VoidTy, ShortTy, ParamIdxTy);
+        M.getOrInsertFunction("__captureOriginalCharVal", VoidTy, CharTy, ParamIdxTy);
+        typeToFuncPtr[std::pair<const Type *, bool>(FloatTy, false)] = M.getFunction("__captureOriginalFloatVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(DoubleTy, false)] = M.getFunction("__captureOriginalDoubleVal"); 
+        typeToFuncPtr[std::pair<const Type *, bool>(IntegerTy, false)] = M.getFunction("__captureOriginalIntegerVal");     
+        typeToFuncPtr[std::pair<const Type *, bool>(ShortTy, false)] = M.getFunction("__captureOriginalShortVal");
+        typeToFuncPtr[std::pair<const Type *, bool>(CharTy, false)] = M.getFunction("__captureOriginalCharVal");
+        
+        M.getOrInsertFunction("__createTbXml", VoidTy, NULL);
+        CreateTbXmlFunc = M.getFunction("__createTbXml");
+        //END LEI
   }
 
   void checkFunctionsStillExist(Function &F) {
@@ -215,6 +172,15 @@ namespace {
     assert(captureValuesFunction && "__captureOriginalPtrVal function has disappeared!\n");
   }
   
+  std::string GetValueName(const Value *V) {
+    if (V) {
+      std::string name;
+      raw_string_ostream namestream(name);
+      V->printAsOperand(namestream, false);
+      return namestream.str();
+    }
+    return "[null]";
+  }
 
   bool runOnFunction(Function &F) { 
                                     
@@ -245,84 +211,29 @@ namespace {
         bool foundWhileBody = GetValueName(CF).find("while.body") != std::string::npos; 
         if (foundForCond or foundForBody or foundWhileCond or foundWhileBody) {
           //we insert instrumentation before the call to the extracted loop
-          for (auto& A : CF->getArgumentList()) {
-            //Type *argTy;
+          //for (auto& A : CF->getArgumentList()) {
+          //  Builder->CreateCall(captureOriginalValuesFunction, A);
+          //}
 
-            //Not sure if we need to distinguish arguments for being pointers or scalars
-            
-            Builder->CreateCall(captureOriginalValuesFunction, A);
-            
-            //if (argTy = A.getParamByValType()) {
-            //  
-
-            //  PointerType *ptrToArg = argTy.getPoinerTo();
-            //  Builder->CreateCall(captureOriginalValuesFunction, argTy);
-            //}
-            //else if (argTy = A.getParamByRefType()) {
-            //  
-            //}
+          IRBuilder<> Builder(parentFunc->getContext()); //adding the call instruction as an insertion point
+          Builder.SetInsertPoint(CI);
+          //for (auto& A : CF->getArgumentList()) {
+          //for (auto *A : ExtractedFuncAndCI.second->args()) {
+          //  //Not sure if we need to distinguish arguments for being pointers or scalars
+          //}
+          errs() << "Reaching this point\n";
+          for (int i = 0; i<CI->getNumArgOperands(); i++) {
+              Value *Arg = CI->getArgOperand(i);
+              errs() << "Creating a call to instr func " << typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)]->getName() << "\n";
+              Builder.CreateCall(typeToFuncPtr[std::pair<Type*, bool>(Arg->getType(), false)], Arg);
           }
-          
         }
       }
     }
-
+    
     return true;
   }
 
-
-
-
-  std::string getBBName(BasicBlock &BB) {
-    char bbNameChrPt[500];
-    if (BB.hasName()) {
-      sprintf(bbNameChrPt, "%s::%s", BB.getParent()->getName().str().c_str(), \
-                                     BB.getName().str().c_str());
-    }
-    else {
-      sprintf(bbNameChrPt, "BBwithNoName%i", bbCounter);
-      ++bbCounter;
-    }
-    std::string bbName(bbNameChrPt);
-    return bbName;
-  }
-
-
-
-  void visitCallInst (CallInst &CI) {
-    if (exitFunction and CI.getCalledFunction() == exitFunction) {
-      Builder->SetInsertPoint(&CI);
-      Builder->CreateCall(reportStatisticsFunction);
-    } else if (exitFunction and CI.getCalledValue()->stripPointerCasts() == exitFunction) {
-      Builder->SetInsertPoint(&CI);
-      Builder->CreateCall(reportStatisticsFunction);
-    } else { //we also tolerate indirect calls
-      if (not CI.getCalledFunction() or not CI.getCalledFunction()->isIntrinsic()) {
-        if (functionPtrs.find(CI.getCalledFunction()) == functionPtrs.end()) {
-          Builder->SetInsertPoint(CI.getNextNode());
-          CallInst *CI2 = Builder->CreateCall(endCallFunction);
-          Builder->SetInsertPoint(&CI);
-          CallInst *CI3 = Builder->CreateCall(startCallFunction); //the CreateCall routine receives Value objects
-
-
-           if (MDNode *MD = CI.getMetadata("dbg")) {
-             CI2->setMetadata("dbg", MD);
-             CI3->setMetadata("dbg", MD);
-           }
-        }
-      } else { //intrinsic
-        Type *CharPtrTy = Type::getInt8PtrTy(TheContext);
-        Value *functionNameParam = Builder->CreatePointerCast(Builder->CreateGlobalStringPtr(CI.getCalledFunction()->getName()), CharPtrTy);
-        CallInst *CI2 = Builder->CreateCall(startIntrinsic, functionNameParam);
-        if (MDNode *MD = CI.getMetadata("dbg"))
-          CI2->setMetadata("dbg", MD);
-      }
-    }
-
-  }
-   // void visitAtomicCmpXchgInst(AtomicCmpXchgInst &I);
-   // void visitAtomicRMWInst(AtomicRMWInst &I);
-   // void visitMemIntrinsic(MemIntrinsic &MI);
   };
 } // end anon namespace
 
