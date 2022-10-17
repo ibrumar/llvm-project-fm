@@ -9,6 +9,7 @@ using namespace std;
 
 extern "C" void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx);
 extern "C" void __createTbXml(const char *funcName, long long int numArgs);
+extern void __setPtrSize(void *ptr, long long int size);
 
 std::map<long long int, long long int> SizesCache;
 
@@ -29,11 +30,12 @@ std::string string_format( const std::string& format, Args ... args )
 }
 
 
+
 //TODO: parse initial param id in verilog.
 //TODO: use templates to cover all the types with the same implementation.
 
 //for each pointer we will also register the original name
-void setPtrSize(void *ptr, long long int size) {
+void __setPtrSize(void *ptr, long long int size) {
   SizesCache[(long long int) ptr] = size;
 }
 
