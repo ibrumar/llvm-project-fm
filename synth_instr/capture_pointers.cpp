@@ -6,12 +6,16 @@
 #include <memory>
 using namespace std;
 
+
+extern "C" void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx);
+extern "C" void __createTbXml(const char *funcName, long long int numArgs);
+
 std::map<long long int, long long int> SizesCache;
 
 ofstream xmlfile;
 
 int initialParamIdInVerilog = 5;
-int numArgsGl;
+long long int numArgsGl;
 
 template<typename ... Args>
 std::string string_format( const std::string& format, Args ... args )
@@ -33,7 +37,9 @@ void setPtrSize(void *ptr, long long int size) {
   SizesCache[(long long int) ptr] = size;
 }
 
+
 void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
+  std::cout << "Writting from here2\n";
   std::string param_id; 
   xmlfile << string_format("Pd%lli=\"{", paramIdx + initialParamIdInVerilog);
   long long int paramSize = SizesCache[(long long int) arr];
@@ -52,7 +58,8 @@ void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
 }
 
 //this happens before any capture function
-void __createTbXml(const char *funcName, int numArgs) {
+void __createTbXml(const char *funcName, long long int numArgs) {
+  std::cout << "Writting from here1\n";
   numArgsGl = numArgs;
 
   //create file with params
