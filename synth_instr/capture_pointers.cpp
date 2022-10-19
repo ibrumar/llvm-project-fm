@@ -47,7 +47,7 @@ void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
   long long int paramSize = SizesCache[(long long int) arr];
   for (int i = 0; i < paramSize; ++i) {
     if (i == paramSize - 1)
-      xmlfile << string_format("%f}", arr[i]);
+      xmlfile << string_format("%f", arr[i]);
     else
       xmlfile << string_format("%f, ", arr[i]);
   }
