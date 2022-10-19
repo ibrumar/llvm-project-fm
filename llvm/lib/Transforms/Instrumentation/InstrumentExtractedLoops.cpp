@@ -88,6 +88,7 @@ namespace {
     
     std::map<std::pair<const Type *, bool>, Function * > typeToFuncPtr;
     Function *CreateTbXmlFunc;
+    std::set<Function*> functionPtrs;
   public:
     static char ID;
     InstrumentExtractedLoopsLegacyPass(): FunctionPass(ID) { }
@@ -167,7 +168,7 @@ namespace {
   }
 
   void checkFunctionsStillExist(Function &F) {
-    captureValuesFunction = F.getParent()->getFunction("__captureOriginalPtrVal");
+    Function *captureValuesFunction = F.getParent()->getFunction("__captureOriginalPtrVal");
     functionPtrs.insert(captureValuesFunction);
     assert(captureValuesFunction && "__captureOriginalPtrVal function has disappeared!\n");
   }
@@ -194,7 +195,7 @@ namespace {
 
     //We use this for all the functions otherwise we would use the indirect calls
     IRBuilder<> TheBuilder(&(*F.getEntryBlock().getFirstInsertionPt()));
-    Builder = &TheBuilder;
+    IRBuilder<> *Builder = &TheBuilder;
 
     Value *NumInstInBB = ConstantInt::get(IntegerTy, BB.getInstList().size());
     checkCallArgsV.push_back(NumInstInBB);
