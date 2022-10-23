@@ -6,8 +6,20 @@
 #include <memory>
 using namespace std;
 
-
+//extern C is necessary for linking against llvm that didn't declare these functions
 extern "C" void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx);
+extern "C" void __captureOriginalFloatPtrVal(float *arr, long long int paramIdx);
+extern "C" void __captureOriginalIntPtrVal(int *arr, long long int paramIdx);
+extern "C" void __captureOriginalShortPtrVal(short *arr, long long int paramIdx);
+extern "C" void __captureOriginalCharPtrVal(char *arr, long long int paramIdx);
+
+extern "C" void __captureOriginalDoubleVal(double val, long long int paramIdx);
+extern "C" void __captureOriginalFloatVal(float val, long long int paramIdx);
+extern "C" void __captureOriginalIntegerVal(int val, long long int paramIdx);
+extern "C" void __captureOriginalShortVal(short val, long long int paramIdx);
+extern "C" void __captureOriginalCharVal(char val, long long int paramIdx);
+
+
 extern "C" void __createTbXml(const char *funcName, long long int numArgs);
 extern void __setPtrSize(void *ptr, long long int size);
 
@@ -15,7 +27,7 @@ std::map<long long int, long long int> SizesCache;
 
 ofstream xmlfile;
 
-int initialParamIdInVerilog = 5;
+int initialParamIdInVerilog = 0;
 long long int numArgsGl;
 
 template<typename ... Args>
@@ -40,16 +52,16 @@ void __setPtrSize(void *ptr, long long int size) {
 }
 
 
-void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
-  std::cout << "Writting from here2\n";
+template <typename T>
+void __captureOriginalPtrTemp(T *arr, long long int paramIdx) { 
   std::string param_id; 
-  xmlfile << string_format("Pd%lli=\"{", paramIdx + initialParamIdInVerilog);
+  xmlfile << string_format("P%lli=\"{", paramIdx + initialParamIdInVerilog);
   long long int paramSize = SizesCache[(long long int) arr];
   for (int i = 0; i < paramSize; ++i) {
     if (i == paramSize - 1)
-      xmlfile << string_format("%f", arr[i]);
+      xmlfile << arr[i];
     else
-      xmlfile << string_format("%f, ", arr[i]);
+      xmlfile << arr[i] << ", ";
   }
   xmlfile << "}\" ";
 
@@ -57,6 +69,74 @@ void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
     xmlfile << "/>\n</function>";
     xmlfile.close();
   }
+}
+
+//the only difference with the previous method
+template <typename T>
+void __captureOriginalValTemp(T val, long long int paramIdx) { 
+  std::string param_id; 
+  xmlfile << string_format("P%lli=\"", paramIdx + initialParamIdInVerilog);
+  xmlfile << val;
+  xmlfile << "\" ";
+
+  if (paramIdx == numArgsGl - 1) {
+    xmlfile << "/>\n</function>";
+    xmlfile.close();
+  }
+}
+
+
+void __captureOriginalDoublePtrVal(double *arr, long long int paramIdx) {
+  __captureOriginalPtrTemp(arr, paramIdx);
+}
+
+
+void __captureOriginalIntPtrVal(int *arr, long long int paramIdx) {
+  __captureOriginalPtrTemp(arr, paramIdx);
+}
+
+
+void __captureOriginalFloatPtrVal(float *arr, long long int paramIdx) {
+  __captureOriginalPtrTemp(arr, paramIdx);
+}
+
+
+void __captureOriginalCharPtrVal(char *arr, long long int paramIdx) {
+  __captureOriginalPtrTemp(arr, paramIdx);
+}
+
+
+
+void __captureOriginalShortPtrVal(short *arr, long long int paramIdx) {
+  __captureOriginalPtrTemp(arr, paramIdx);
+}
+
+//Scalars implementation
+
+
+void __captureOriginalDoubleVal(double val, long long int paramIdx) {
+  __captureOriginalValTemp(val, paramIdx);
+}
+
+
+void __captureOriginalIntegerVal(int val, long long int paramIdx) {
+  __captureOriginalValTemp(val, paramIdx);
+}
+
+
+void __captureOriginalFloatVal(float val, long long int paramIdx) {
+  __captureOriginalValTemp(val, paramIdx);
+}
+
+
+void __captureOriginalCharVal(char val, long long int paramIdx) {
+  __captureOriginalValTemp(val, paramIdx);
+}
+
+
+
+void __captureOriginalShortVal(short val, long long int paramIdx) {
+  __captureOriginalValTemp(val, paramIdx);
 }
 
 //this happens before any capture function

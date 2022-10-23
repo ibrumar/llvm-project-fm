@@ -1295,7 +1295,7 @@ std::pair<Function *, CallInst*> CodeExtractor::extractCodeRegion() {
           }
         }
     }
-  errs() << "Managed to peform the extraction\n";
+  errs() << "Managed to peform the extraction of " << newFunction->getName() << "\n";
   LLVM_DEBUG(if (verifyFunction(*newFunction))
                  report_fatal_error("verifyFunction failed!"));
   return std::pair<Function *, CallInst *>(newFunction, CI);
