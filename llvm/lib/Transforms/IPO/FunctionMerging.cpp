@@ -3080,23 +3080,28 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     return ErrorResponse;
   }
 
+//  std::set< std::pair<BasicBlock *, > >
+
   unsigned NumMatches = 0;
   unsigned TotalEntries = 0;
   AcrossBlocks = false;
   BasicBlock *CurrBB0 = nullptr;
   BasicBlock *CurrBB1 = nullptr;
+
+
+  unsigned NumAcrossBlocks = 0;
   for (auto &Entry : AlignedSeq) {
     TotalEntries++;
     if (Entry.match()) {
       NumMatches++;
-      if (isa<BasicBlock>(Entry.get(1))) {
+      if (isa<BasicBlock>(Entry.get(1))) { //Iuli: what's the meaning here. is it just that the
         CurrBB1 = dyn_cast<BasicBlock>(Entry.get(1));
       } else if (auto *I = dyn_cast<Instruction>(Entry.get(1))) {
         if (CurrBB1 == nullptr)
           CurrBB1 = I->getParent();
         else if (CurrBB1 != I->getParent()) {
-          AcrossBlocks = true;
-        }
+          AcrossBlocks = true;//if the bb parent of the current instruction
+        }                     //is different than the previous one, but how can this ever happen
       }
       if (isa<BasicBlock>(Entry.get(0))) {
         CurrBB0 = dyn_cast<BasicBlock>(Entry.get(0));
@@ -3114,6 +3119,46 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
         CurrBB0 = nullptr;
     }
   }
+
+  Instruction *II;
+
+  std::map<BasicBlock *, std::set<BasicBlock *> > bbMappings;
+  for (auto &Entry : AlignedSeq) {
+    if (not Entry.match())
+      continue;
+
+    assert(Entry.get(1) and (II = dyn_cast<Instruction>(Entry.get(1))));
+    BasicBlock *BB1 = II->getParent();
+    assert(Entry.get(0) and (II = dyn_cast<Instruction>(Entry.get(0))));
+    BasicBlock *BB0 = II->getParent();
+
+    auto It = bbMappings.find(BB0);
+    if (It == bbMappings.end()) {
+      std::set<BasicBlock *> setToInsert;
+      setToInsert.insert(BB1);
+      bbMappings.insert(
+          std::pair<BasicBlock *, std::set<BasicBlock *>>(BB0, setToInsert));
+    } else
+      It->second.insert(BB1);
+
+    It = bbMappings.find(BB1);
+    if (It == bbMappings.end()) {
+      std::set<BasicBlock *> setToInsert;
+      setToInsert.insert(BB0);
+      bbMappings.insert(
+          std::pair<BasicBlock *, std::set<BasicBlock *>>(BB1, setToInsert));
+    } else
+      It->second.insert(BB0);
+  }
+
+  unsigned numNonOneToOne = 0;
+  //now identifying how many non 1:1 pairs there are
+  for (auto it = bbMappings.begin(); it != bbMappings.end(); ++it) {
+    if (it->second.size() > 1)
+      ++numNonOneToOne;
+  }
+  errs() << "The number of non 1:1 alignments for this merge are " << numNonOneToOne << " ";
+  errs() << "for func1 " << GetValueName(F1) << " and " << GetValueName(F2) << "\n";
   if (AcrossBlocks) {
     if (Verbose) {
       errs() << "Across Basic Blocks\n";
