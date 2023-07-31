@@ -3127,10 +3127,18 @@ FunctionMerger::merge(Function *F1, Function *F2, std::string Name, const Functi
     if (not Entry.match())
       continue;
 
-    assert(Entry.get(1) and (II = dyn_cast<Instruction>(Entry.get(1))));
-    BasicBlock *BB1 = II->getParent();
-    assert(Entry.get(0) and (II = dyn_cast<Instruction>(Entry.get(0))));
-    BasicBlock *BB0 = II->getParent();
+    BasicBlock *BB1;
+    if (isa<BasicBlock>(Entry.get(1)))
+      BB1 = dyn_cast<BasicBlock>(Entry.get(1));
+    else
+      BB1 = dyn_cast<Instruction>(Entry.get(1))->getParent();
+    
+    BasicBlock *BB0;
+    if (isa<BasicBlock>(Entry.get(0)))
+      BB1 = dyn_cast<BasicBlock>(Entry.get(0));
+    else
+      BB1 = dyn_cast<Instruction>(Entry.get(0))->getParent();
+
 
     auto It = bbMappings.find(BB0);
     if (It == bbMappings.end()) {
@@ -5837,6 +5845,7 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
         std::set<BasicBlock *> nonalig_bbsf2;
 
         for (Function &F : M) {
+            errs() << "Looking at function " << GetValueName(&F) << "\n";
             if (GetValueName(&F) == funcNames.first) {
 
                 //demoteRegToMem(F);
@@ -5859,7 +5868,15 @@ FileOpcodeWeights("opcode-weights-file", cl::value_desc(""),
                 continue;
         }
         int i = 1; 
+        
         //This could be failing
+        if (mergingInput1.size() == 0) {
+          errs() << "Function1 = " << funcNames.first << " could not be found\n";
+          exit(0);
+        } else if (mergingInput2.size() == 0) {
+          errs() << "Function2 = " << funcNames.second << " could not be found\n";
+          exit(0);
+        }
         Function *F1 = mergingInput1[i - 1];
         Function *F2 = mergingInput2[i - 1];
 

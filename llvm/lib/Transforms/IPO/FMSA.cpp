@@ -2710,6 +2710,7 @@ static bool match(SmallVectorImpl<Value *> &F1, SmallVectorImpl<Value *> &F2,
   NeedlemanWunschSimilarityMatrix::NeedlemanWunschSimilarityMatrix(SmallVectorImpl<Value *> &F1,
                                   SmallVectorImpl<Value *> &F2)
       : F1(F1), F2(F2) {
+    errs() << "Executing NW similarity matrix\n";
     NumRows = F1.size() + 1;             // rows
     NumCols = F2.size() + 1;             // cols
     Matrix = new int[NumRows * NumCols]; // last element keeps the max
@@ -4932,9 +4933,10 @@ void static UpdateCallGraph(Module &M, MergedFunction &Result,
   if (profilingInfo != 0)
     (Result.MergedFunc)->setEntryCount(profilingInfo);
   
+
   replaceByCall(&M, F1, Result);
   replaceByCall(&M, F2, Result);
-
+  /*
   bool CanEraseF1 = replaceCallsWith(&M, F1, Result);
   bool CanEraseF2 = replaceCallsWith(&M, F2, Result);
 
@@ -4952,7 +4954,7 @@ void static UpdateCallGraph(Module &M, MergedFunction &Result,
       (AlwaysPreserved.find(F2->getName()) == AlwaysPreserved.end())) {
     // CallSiteExtractedLoops.erase(F2);
     F2->eraseFromParent();
-  }
+  }*/
 }
 
 bool FMSALegacyPass::shouldPreserveGV(const GlobalValue &GV) {
